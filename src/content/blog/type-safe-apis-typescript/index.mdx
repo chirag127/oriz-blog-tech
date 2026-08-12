@@ -1,0 +1,93 @@
+---
+title: "Type-safe APIs, end to end, without a framework religion"
+description: "Where TypeScript types stop and runtime validation must start, why one schema should drive both, and a pattern that keeps client and server honest across the network boundary."
+pubDate: 2026-08-11
+tags: [typescript, api, zod, validation]
+category: "Dev"
+author: "Chirag Singhal"
+readingTime: "8 min"
+---
+
+"Type-safe API" gets thrown around as if a `.ts` extension makes the network trustworthy. It does not. Here is where TypeScript's guarantees actually end, and how to extend safety past that line without adopting a whole framework's worldview.
+
+## The line TypeScript cannot cross
+
+TypeScript checks your code at compile time and then erases itself. At runtime there are no types — only values. The moment data crosses a boundary you don't control, the compiler's promises expire.
+
+That boundary is everywhere in an API:
+
+- The JSON body of an incoming request.
+- The response from a third-party service.
+- A row from the database whose shape drifted since you wrote the type.
+- Anything from `JSON.parse`, which is typed `any` and lies to you cheerfully.
+
+You can write `const body: CreateUser = await req.json()`, and TypeScript will believe you. At runtime, `body` is whatever the caller sent — an empty object, a string, a payload with an extra field and a missing one. The type annotation is a comment the compiler happens to read. This is the single most common source of "but it's TypeScript, how did this crash" incidents.
+
+## Validate at the edge, trust inside
+
+The fix is a discipline, not a library: **validate untrusted data once, at the boundary, and let the validator produce the type.** Inside that boundary you work with real, typed values and never validate again.
+
+A runtime schema library — Zod is the common choice — lets one declaration do both jobs:
+
+```ts
+import { z } from "zod"
+
+const CreateUser = z.object({
+  email: z.string().email(),
+  age: z.number().int().min(13),
+  role: z.enum(["reader", "author"]).default("reader"),
+})
+
+type CreateUser = z.infer<typeof CreateUser>
+```
+
+`CreateUser` is now two things at once: a runtime checker and a static type derived from it. There is no second hand-written interface to drift out of sync. Change the schema and the type changes with it — that co-evolution is the entire point.
+
+At the request boundary you parse, not cast:
+
+```ts
+const result = CreateUser.safeParse(await req.json())
+if (!result.success) {
+  return json({ error: result.error.flatten() }, { status: 400 })
+}
+// result.data is CreateUser — validated, typed, safe from here on.
+```
+
+After that line, the rest of your handler is honest TypeScript over real data. You have converted an `any` from the wire into a value the compiler's guarantees actually apply to.
+
+## Make the contract shared, not copied
+
+The email you validated on the server is the email your client sends. If the client has its own separate notion of the shape, the two drift and the network boundary becomes a liar again — this time in both directions.
+
+Put the schemas in a module both sides import:
+
+```
+packages/contract/  → CreateUser, User, ApiError schemas
+apps/server/         → imports contract, validates requests
+apps/web/            → imports contract, validates responses + builds forms
+```
+
+Now the schema is the single source of truth. The server validates what comes in; the client validates what comes back and reuses the same schema to drive form validation. One change propagates to both ends, and a mismatch surfaces as a type error at build time instead of a bug in production.
+
+This is the durable idea behind the RPC-style toolkits people reach for. You do not need the toolkit to get the benefit — you need a shared contract module and the discipline to import it on both sides.
+
+## Validate responses too, especially other people's
+
+Teams validate inbound requests and then trust every response blindly. But a third-party API, or your own service a version behind, is exactly as untrustworthy as a random caller. Parse those too:
+
+```ts
+const raw = await fetch(url).then((r) => r.json())
+const user = User.parse(raw) // throws loudly if the upstream shape changed
+```
+
+The payoff is a precise failure. When an upstream provider quietly renames a field, you get a validation error pointing at the exact field, at the exact call site — not a `cannot read property of undefined` three functions deeper where the bad value finally got used.
+
+## What this does not require
+
+You do not need a full-stack meta-framework, a code generator, or a specific runtime to be type-safe end to end. The pattern is portable across Express, Hono, Astro endpoints, serverless functions, anything:
+
+1. One schema library that infers types from runtime schemas.
+2. A shared contract module both client and server import.
+3. A rule: parse at every boundary you don't own, then never validate again inside.
+
+Adopt those three and "type-safe API" stops being a slogan on a landing page and becomes a property your code actually has. Skip them and TypeScript is a very elaborate way of writing comments that the network ignores.

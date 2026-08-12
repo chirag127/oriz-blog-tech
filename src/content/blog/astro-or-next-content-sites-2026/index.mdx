@@ -1,0 +1,61 @@
+---
+title: "Astro or Next for a content site in 2026"
+description: "A decision framework, not a benchmark war. When Astro's zero-JS default wins, when Next's app model earns its weight, and the one question that settles most arguments."
+pubDate: 2026-08-08
+tags: [astro, nextjs, web-dev, performance]
+category: "Dev"
+author: "Chirag Singhal"
+readingTime: "8 min"
+---
+
+The framework debate is usually argued at the wrong altitude — bundle sizes and hydration strategies — when the real question is about the shape of your site. Here is the decision the way I actually make it.
+
+## Ask this first
+
+**How much of your site is content versus application?**
+
+Draw a line down the middle of what you are building. On one side: pages that are mostly text and images, rendered once, read many times — a blog, docs, a marketing site, a changelog. On the other side: pages that hold state, react to the user, and change constantly — a dashboard, an editor, a live feed, anything behind a login.
+
+Astro is built for the content side. Next is built for the application side. Both can cross over, and both do it competently, but each pays a tax when it works against its grain. Most "which framework" arguments are really two people picturing sites at opposite ends of that line.
+
+## What Astro is actually good at
+
+Astro's default is zero JavaScript shipped to the browser. A page renders to HTML at build time and stays HTML. There is no framework runtime, no hydration, no client bundle — until you explicitly ask for one.
+
+That default is the whole pitch. A content site is a pile of pages that don't need to be interactive, and Astro treats "don't ship JS" as the normal case rather than an optimization you fight for. When you *do* need an interactive widget — a search box, a theme toggle, a comment island — you drop in a component and mark it to hydrate. That is the **islands** model: static HTML everywhere, small pools of interactivity exactly where you placed them.
+
+The practical consequences:
+
+- Lighthouse scores are high by default, not after a week of tuning.
+- You can author content as Markdown or MDX and get typed frontmatter through content collections — a real schema, validated at build.
+- You can use React, Svelte, or Vue components inside the same project, because Astro treats them all as island renderers.
+
+Where Astro strains: a genuinely app-like surface. If half your site is a stateful, client-heavy application, you end up with so many islands that you have rebuilt an SPA the hard way. That is the signal you are on the wrong side of the line.
+
+## What Next is actually good at
+
+Next's app model treats the server and client as one continuous program. Server Components render on the server and stream to the browser; client components hydrate where you mark them; data fetching, caching, and mutations have first-class primitives. For an application — personalized, authenticated, constantly changing — that integrated model is worth its weight.
+
+Next also wins when your team already lives in React and the site is one surface of a larger React product. Sharing components, conventions, and mental model across a marketing page and the app behind it has real value, even if the marketing page alone would have been lighter in Astro.
+
+Where Next strains: a pure content site pays for machinery it doesn't use. You will ship more JavaScript than an equivalent Astro build, and you will spend effort keeping a fundamentally static site fast — trimming client components, watching the bundle, reaching for static export.
+
+## The honest middle
+
+Two facts keep the choice from being religious:
+
+1. **Astro can do dynamic.** It has server-rendered routes, API endpoints, and adapters for the major hosts. A mostly-static site with a few dynamic corners is squarely in Astro's range.
+2. **Next can do static.** Static export and aggressive caching get a Next content site most of the way to Astro's numbers.
+
+So the decision is rarely "impossible in the other one." It is "which grain am I cutting with."
+
+## How I decide, concretely
+
+- **A blog, docs, or marketing site, content-first, SEO matters, minimal interactivity** → Astro. The zero-JS default is the feature, and content collections make the authoring pipeline pleasant.
+- **An app with content bolted on — a SaaS product with a marketing site and a dashboard behind auth** → Next, and put the marketing pages in the same app for shared components.
+- **A team that is deep in React and values one stack over the last few kilobytes** → Next, and accept the tax knowingly.
+- **A content site where performance is a headline requirement and every kilobyte is scrutinized** → Astro, no contest.
+
+## The tie-breaker
+
+If you have read this far and still can't decide, your site is probably content-first — otherwise the application half would have made the call obvious. Ship Astro, keep the interactive bits as islands, and revisit only if the interactive surface grows past the point where islands feel like fighting the framework. That threshold is loud when you hit it. Until then, the lighter default wins.

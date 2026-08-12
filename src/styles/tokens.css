@@ -1,0 +1,237 @@
+/*
+ * tokens.css — oriz-blog-tech identity ("Blueprint", 2026-08-12).
+ *
+ * A software-engineering blog rendered as an engineering DRAWING SET.
+ * Deliberately distinct from every sibling oriz.in app and from oriz-blog's
+ * dark amber "Signal Press" — and it refuses the tired dev cliché of a
+ * near-black terminal with acid-green text.
+ *
+ *   Warm drafting-paper surface · graphite ink · engineer's red-pencil accent
+ *   (the correction pen) · blueprint navy structural lines · Space Grotesk
+ *   display · Newsreader serif body · IBM Plex Mono metadata.
+ *
+ * Every --color-* alias is kept so chrome/legal/Footer components (which read
+ * the shell token names) compile unchanged. Theme modes:
+ *   :root                              → light drafting paper (default)
+ *   @media (prefers-color-scheme:dark) → blueprint navy field, UNLESS [data-theme="light"]
+ *   [data-theme="dark"]                → blueprint navy, always
+ *   [data-theme="sepia"]               → warm vellum variant
+ *   [data-theme="hc"]                  → pure black/white high contrast
+ */
+:root {
+  color-scheme: light;
+
+  /* ── Blueprint (light) palette ─────────────────────────────────────────
+     Ink on warm drafting vellum. The accent is an engineer's red pencil —
+     the mark you make to correct a drawing. Blueprint navy is the structural
+     second colour (grid lines, schematic strokes), never the click accent. */
+  --brand: #c8102e; /* engineer's red-pencil correction — links, active, primary */
+  --brand-soft: #f7dee2; /* faint red tint — hover, chips */
+  --blueprint: #1b3a6b; /* deep blueprint navy — grid + schematic lines */
+  --success: #2f7d4f;
+  --danger-color: #c8102e;
+
+  --paper: #f4f1ea; /* warm drafting-paper vellum (page bg) */
+  --paper-2: #eee9de; /* recessed drawing field / panel */
+  --surface: var(--paper-2);
+  --ink: #16130f; /* graphite near-black text */
+  --ink-mute: #6b6459; /* pencil-gray secondary */
+  --rule: #d8d1c2; /* faint drafting hairline */
+  --rule-strong: #b8ae99; /* heavier title-block border */
+
+  /* canonical accent — red pencil. Everything routes through --accent.
+     --cobalt kept ONLY as a back-compat alias → --accent. */
+  --accent: var(--brand);
+  --accent-soft: var(--brand-soft);
+  --cobalt: var(--accent);
+  --brand-tint: var(--brand-soft);
+  --sage: var(--success);
+  --vermilion: var(--danger-color);
+  --highlighter: var(--brand);
+
+  /* discipline marker colours — thin ticks / kickers only, never the page
+     accent. Dev · Finance · Culture · Health mapped onto engineering hues. */
+  --v-dev: #1b3a6b; /* blueprint navy */
+  --v-finance: #2f7d4f; /* schematic green */
+  --v-culture: #7a3ea0; /* violet trace */
+  --v-health: #0e7490; /* teal trace */
+  --v-personal: #6b6459; /* graphite */
+
+  /* semantic passthroughs */
+  --color-bg: var(--paper);
+  --color-fg: var(--ink);
+  --color-accent: var(--brand);
+  --color-accent-fg: #f4f1ea;
+  --color-sage: var(--success);
+  --color-muted: var(--ink-mute);
+  --color-border: var(--rule);
+  --color-bg-soft: var(--paper-2);
+  --color-bg-muted: var(--paper-2);
+  --color-prose: var(--ink);
+  --color-fg-muted: var(--ink-mute);
+  --color-fg-soft: var(--ink-mute);
+
+  /* color alias layer (chrome components read these) */
+  --color-brand-indigo: var(--brand); /* name kept for compatibility */
+  --color-brand-indigo-soft: var(--brand-soft);
+  --color-brand-success: var(--success);
+  --color-brand-danger: var(--danger-color);
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #eee9de;
+  --color-neutral-100: #e6e0d2;
+  --color-neutral-200: #d8d1c2;
+  --color-neutral-300: #b8ae99;
+  --color-neutral-500: #6b6459;
+  --color-neutral-700: #3a352d;
+  --color-neutral-900: #16130f;
+  --color-neutral-1000: #000000;
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-ink-mute: var(--ink-mute);
+  --color-rule: var(--rule);
+
+  /* ── type ───────────────────────────────────────────────────────────
+     Font families are declared ONCE, in global.css @theme (Tailwind emits
+     the --font-* custom properties from there). Not duplicated here to
+     avoid last-write-wins drift between the two files.
+     ─────────────────────────────────────────────────────────────────── */
+
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 48px;
+
+  /* spacing — 8 steps */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* motion — 3 durations + 3 easings */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* breakpoints */
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1440px;
+
+  /* radii + containers — drafting aesthetic: near-sharp corners */
+  --radius-card: 2px;
+  --radius-button: 2px;
+  --container-page: 1100px;
+}
+
+/* ── DARK — blueprint navy field, unless user forced light ──────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    /* the classic blueprint: cyan-white ink on deep navy, red pencil kept */
+    --brand: #ff5d6c;
+    --brand-soft: #33161b;
+    --blueprint: #6ea8ff;
+    --paper: #0d1420;
+    --paper-2: #131d2e;
+    --ink: #e8edf4;
+    --ink-mute: #8ea0b8;
+    --rule: #23324a;
+    --rule-strong: #35486a;
+    --v-dev: #6ea8ff;
+    --v-finance: #4bd08a;
+    --v-culture: #c084fc;
+    --v-health: #38bdf8;
+    --v-personal: #8ea0b8;
+    --color-accent-fg: #0d1420;
+    --color-neutral-50: #131d2e;
+    --color-neutral-100: #1a2436;
+    --color-neutral-200: #23324a;
+    --color-neutral-500: #8ea0b8;
+    --color-neutral-700: #c3cede;
+    --color-neutral-900: #e8edf4;
+  }
+}
+
+/* ── DARK — explicit user override, wins over system ────────────────── */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --brand: #ff5d6c;
+  --brand-soft: #33161b;
+  --blueprint: #6ea8ff;
+  --paper: #0d1420;
+  --paper-2: #131d2e;
+  --ink: #e8edf4;
+  --ink-mute: #8ea0b8;
+  --rule: #23324a;
+  --rule-strong: #35486a;
+  --v-dev: #6ea8ff;
+  --v-finance: #4bd08a;
+  --v-culture: #c084fc;
+  --v-health: #38bdf8;
+  --v-personal: #8ea0b8;
+  --color-accent-fg: #0d1420;
+  --color-neutral-50: #131d2e;
+  --color-neutral-100: #1a2436;
+  --color-neutral-200: #23324a;
+  --color-neutral-500: #8ea0b8;
+  --color-neutral-700: #c3cede;
+  --color-neutral-900: #e8edf4;
+}
+
+/* ── SEPIA — warm vellum, red-pencil accent ─────────────────────────── */
+:root[data-theme='sepia'] {
+  color-scheme: light;
+  --brand: #b31229;
+  --brand-soft: #f3dbde;
+  --blueprint: #24406e;
+  --paper: #efe7d3;
+  --paper-2: #e7dcc4;
+  --ink: #2b271f;
+  --ink-mute: #7a7159;
+  --rule: #d6c9ab;
+  --rule-strong: #b8a880;
+  --color-accent-fg: #efe7d3;
+  --color-fg-soft: color-mix(in oklab, var(--ink) 55%, var(--paper));
+  --color-neutral-50: #efe7d3;
+  --color-neutral-100: #e7dcc4;
+  --color-neutral-200: #d6c9ab;
+  --color-neutral-500: #7a7159;
+  --color-neutral-700: #524a38;
+  --color-neutral-900: #2b271f;
+}
+
+/* ── HIGH-CONTRAST — pure black/white, hard borders ─────────────────── */
+:root[data-theme='hc'] {
+  color-scheme: light;
+  --brand: #b3001b;
+  --brand-soft: #ffdbe0;
+  --blueprint: #002b6b;
+  --paper: #ffffff;
+  --paper-2: #ffffff;
+  --ink: #000000;
+  --ink-mute: #2a2a2a;
+  --rule: #000000;
+  --rule-strong: #000000;
+  --color-accent-fg: #ffffff;
+  --color-fg-soft: #2a2a2a;
+  --color-neutral-50: #ffffff;
+  --color-neutral-100: #ffffff;
+  --color-neutral-200: #000000;
+  --color-neutral-500: #2a2a2a;
+  --color-neutral-700: #000000;
+  --color-neutral-900: #000000;
+}

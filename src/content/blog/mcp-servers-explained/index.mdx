@@ -1,0 +1,80 @@
+---
+title: "MCP servers, explained for people who ship"
+description: "The Model Context Protocol in plain terms: what a server actually exposes, the transport choices that matter, and how to build one without over-engineering it."
+pubDate: 2026-08-05
+tags: [mcp, ai, tooling, protocols]
+category: "Dev"
+author: "Chirag Singhal"
+readingTime: "7 min"
+featured: true
+---
+
+Every AI tool now claims to "support MCP." Most explanations start with the spec and lose you by paragraph two. Here is the version that actually helps you build one.
+
+## The one-sentence model
+
+The Model Context Protocol is a standard way for an AI client to discover and call your tools, read your resources, and reuse your prompts — over a defined wire format — so you write the integration once instead of once per client.
+
+Before MCP, connecting a model to your database meant a bespoke adapter for Claude, another for your IDE, another for your agent framework. MCP is the USB-C version of that plug: one server, many clients.
+
+## What a server exposes
+
+An MCP server offers three primitives. You rarely need all three.
+
+- **Tools** — functions the model can call. `search_orders(customer_id)`, `run_query(sql)`, `create_ticket(...)`. This is the one everybody uses. Each tool has a name, a description, and a JSON Schema for its arguments. The description is not documentation — it is the prompt. The model decides whether to call your tool based on that text, so write it for a reader who has never seen your system.
+- **Resources** — readable data the client can pull into context. Files, rows, a rendered dashboard. Addressed by URI (`db://orders/1234`). Use these when the client should *read* state, not *change* it.
+- **Prompts** — reusable prompt templates the user can invoke by name. The least-used primitive. Skip it until a real workflow demands it.
+
+If you only build tools, you have built a useful MCP server. Resist adding resources and prompts "for completeness."
+
+## Transport is the decision that bites you
+
+The protocol is transport-agnostic, but you pick one, and the choice constrains everything downstream.
+
+- **stdio** — the server runs as a local subprocess; the client talks to it over stdin/stdout. Zero network, zero auth, trivial to ship. This is the right default for anything that runs on the user's own machine: a CLI wrapper, a local file tool, a database client pointed at localhost.
+- **Streamable HTTP** — the server is a web service the client reaches over HTTP, with server-sent events for streaming. This is what you need for a hosted, multi-user server. It also drags in everything a public endpoint drags in: authentication, rate limits, CORS, deployment.
+
+The trap is building HTTP when stdio would do. If the server touches only local resources, ship stdio and move on. Convert to HTTP the day you actually need remote, multi-tenant access — not before.
+
+## A minimal tool, start to finish
+
+The shape of a tool is always the same regardless of SDK: declare a name, a schema, a handler.
+
+```ts
+server.tool(
+  "get_weather",
+  "Current weather for a city. Returns temperature in Celsius.",
+  { city: z.string().describe("City name, e.g. 'Bhubaneswar'") },
+  async ({ city }) => {
+    const data = await fetchWeather(city)
+    return { content: [{ type: "text", text: `${data.tempC}°C, ${data.summary}` }] }
+  },
+)
+```
+
+Three things earn their place here and nothing else does:
+
+1. The **description** tells the model when to reach for the tool.
+2. The **schema** (`city: string`) is validated before your handler runs, so you never parse arguments by hand.
+3. The **return** is content the model reads back — keep it terse and factual, because it becomes context the model pays for on every subsequent turn.
+
+## Where servers go wrong
+
+**Chatty return values.** A tool that dumps a 4,000-token JSON blob poisons the context window. Return the answer, not the raw payload. If the model needs the detail, expose a second tool that fetches it on demand.
+
+**Vague descriptions.** "Handles user data" tells the model nothing. "Returns a user's email and signup date by user ID" tells it exactly when to call. Descriptions are the highest-leverage text in the whole server.
+
+**Auth bolted on late.** If you know the server will be hosted, decide the auth story before you write the second tool. Retrofitting auth across a dozen handlers is the worst kind of rework.
+
+**One giant tool.** A `do_everything(action, params)` tool forces the model to construct a mini-DSL in its arguments. Split it. Small, sharply-named tools are easier for the model to select correctly.
+
+## The mental checklist
+
+When you are handed "add MCP support," answer these first:
+
+- Which primitives? (Usually: just tools.)
+- Local or hosted? (stdio unless proven otherwise.)
+- What is the smallest set of tools that covers the real workflow?
+- For each tool: is the description written for a stranger, and is the return value the answer rather than the dump?
+
+Answer those and the implementation is an afternoon. Skip them and you will build the USB-C equivalent of a cable that only fits one laptop.
