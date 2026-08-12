@@ -1,17 +1,17 @@
 ---
 import SeriesSpine from '~/components/SeriesSpine.astro'
+import StackDepth from '~/components/StackDepth.astro'
 /**
- * /  — oriz-blog homepage ("Signal Press" front page).
+ * / — oriz-blog-tech homepage ("Blueprint" notebook).
  *
- * Above the fold: a real newspaper masthead — mono dateline (Vol. N · date ·
- * dispatch count), a big Source Serif 4 nameplate, the active-series spine
- * (`●─●─○─○`), and a colour-flagged LEAD STORY. Below: three hairline strata:
- *   1. IN PROGRESS — series spines
- *   2. RECENT      — last 7 posts, each with its vertical desk kicker
- *   3. BY CATEGORY — one typographic row, each desk in its vertical colour
- *
- * No cover images, no cards, no radius. Verticals (Dev/Finance/Culture/
- * Health/Personal) each carry their own marker colour (--v-*).
+ * Layout: a left-rail shell (AppSidebar) + this right-column page.
+ * Structure:
+ *   A. HEADER BLOCK — drawing-set title block with live metadata fields
+ *   B. LEAD         — latest post, framed as a "diff hunk" (++ lines)
+ *   C. STACK_DEPTH  — bespoke StackDepth register (signature module)
+ *   D. ON THE BOARD — active series with SeriesSpine progress bars
+ *   E. SHEET INDEX  — recent posts as numbered register rows
+ *   F. ls ./topics/ — category scan styled as shell output
  */
 import BaseLayout from '~/layouts/BaseLayout.astro'
 import {
@@ -29,14 +29,9 @@ import { SITE_CONFIG } from '~/lib/config'
 
 const allPosts = await getPublishedPosts()
 const lead = allPosts[0]
-const recentPosts = allPosts.slice(1, 8)
+const recentPosts = allPosts.slice(1, 9)
 
 const seriesAll = await getSeriesWithCounts()
-// In-progress: series where at least one post exists. We model "published"
-// as the count of currently-published parts. Total is exposed as a heuristic
-// (count + a small tail of "drafting" dots) — for v1 of the v2 design, we
-// just use count for total and count for published, and animate the last
-// dot as `current` so the spine has the signature glyph (`⦿`) visible.
 type InProgress = {
   name: string
   slug: string
@@ -53,34 +48,21 @@ for (const { series, count } of seriesAll.slice(0, 4)) {
     (max, p) => (p.data.pubDate > max ? p.data.pubDate : max),
     parts[0].data.pubDate,
   )
-  // Total must never be less than what's already published (otherwise the
-  // label reads "part 29 of 12"). Use the larger of: published count, the
-  // largest explicit `part` field, or published+1 to hint one more coming.
   const explicitMax = parts.reduce((mx, p) => {
     const v = typeof p.data.part === 'number' ? p.data.part : Number(p.data.part)
     return Number.isFinite(v) ? Math.max(mx, v) : mx
   }, 0)
   const total = Math.max(count, explicitMax, count + 1)
-  inProgress.push({
-    name: series,
-    slug: slugifyTag(series),
-    total,
-    published: count,
-    current: count, // last filled dot is "current"
-    latest,
-    parts,
-  })
+  inProgress.push({ name: series, slug: slugifyTag(series), total, published: count, current: count, latest, parts })
 }
 inProgress.sort((a, b) => b.latest.valueOf() - a.latest.valueOf())
 
 const cats = await getCategoriesWithCounts()
 
-// Masthead metadata — the title block reads the current date for its REV field.
 const now = new Date()
 const leadVertical = lead ? postVertical(lead) : 'personal'
 const leadRt = lead ? (lead.data.readingTime ?? readingTimeFor(lead)) : ''
 
-// "Days since" helper for the in-progress rail.
 function ago(date: Date): string {
   const days = Math.floor((Date.now() - date.valueOf()) / 86_400_000)
   if (days < 1) return 'today'
@@ -92,6 +74,8 @@ function ago(date: Date): string {
   const years = Math.floor(days / 365)
   return years === 1 ? '1y ago' : `${years}y ago`
 }
+
+const isoRev = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -109,76 +93,93 @@ const jsonLd = {
   jsonLd={jsonLd}
 >
   <div class="home">
-    {/* Hero = thesis. Left-aligned column, not a full-width masthead. The
-        boxed cartouche belonged to the top-nav template; here the rail is
-        the chrome, so the page opens straight into the argument. */}
-    <section class="hero" aria-label="Masthead">
-      <p class="hero-tab mono">Dwg. no. TB-01 · Field notebook</p>
-      <h1 class="hero-thesis">Software, drawn to scale.</h1>
-      <p class="hero-dek">
-        Working notes from building and running production systems — read like a drawing
-        set: every post a sheet, revised in the open, dimensioned so you can build from it.
+
+    {/* ── A. HEADER BLOCK ──────────────────────────────────────────────── */}
+    <section class="titleblock" aria-label="Notebook header">
+      <div class="tb-reg mono">
+        <span class="tb-dwg">DWG TB-01</span>
+        <span class="tb-sep" aria-hidden="true">/</span>
+        <span class="tb-rev">REV {isoRev}</span>
+        <span class="tb-sep" aria-hidden="true">/</span>
+        <span class="tb-sheets">{allPosts.length} sheets</span>
+        <span class="tb-sep" aria-hidden="true">/</span>
+        <span class="tb-scale">scale 1:1</span>
+      </div>
+      <h1 class="tb-title">Software,<br />drawn to<br />scale.</h1>
+      <p class="tb-dek">
+        Working notes from building production systems —<br class="tb-br" />
+        each post a sheet, dimensioned so you can build from it.
       </p>
-      <dl class="hero-fields mono">
-        <div class="hero-field">
-          <dt>Drawn by</dt>
+      <dl class="tb-fields mono">
+        <div class="tb-field">
+          <dt>Author</dt>
           <dd>Chirag Singhal</dd>
         </div>
-        <div class="hero-field">
-          <dt>Sheets</dt>
-          <dd><span class="count">{allPosts.length}</span> since 2019</dd>
+        <div class="tb-field">
+          <dt>Status</dt>
+          <dd class="tb-live"><span class="tb-dot" aria-hidden="true"></span>Live</dd>
         </div>
-        <div class="hero-field">
-          <dt>Scale</dt>
-          <dd>1:1</dd>
+        <div class="tb-field">
+          <dt>Stack</dt>
+          <dd>Astro · TS · CF</dd>
         </div>
-        <div class="hero-field">
-          <dt>Rev.</dt>
-          <dd>{now.getFullYear()}·{String(now.getMonth() + 1).padStart(2, '0')}</dd>
+        <div class="tb-field">
+          <dt>Feed</dt>
+          <dd><a href="/rss.xml">rss.xml</a></dd>
         </div>
       </dl>
     </section>
 
+    {/* ── B. LEAD — diff-hunk framing ──────────────────────────────────── */}
     {lead && (
-      <>
-        <section class="lead" data-vertical={leadVertical} aria-labelledby="lead-title">
-          <a class="lead-link" href={`/blog/${lead.id}`}>
-            <span class="lead-kicker mono">
-              <span class="lead-tick" aria-hidden="true"></span>
-              <span class="lead-desk">{verticalLabel(leadVertical)}</span>
-              <span class="lead-flag">Sheet 01 · Lead</span>
+      <section class="lead-diff" data-vertical={leadVertical} aria-labelledby="lead-title">
+        <div class="diff-hunk mono">
+          <span class="diff-hunk-header">@@ latest &nbsp; +{lead.data.pubDate.toISOString().slice(0,10)} &nbsp; {leadVertical} @@</span>
+        </div>
+        <a class="diff-body" href={`/blog/${lead.id}`}>
+          <span class="diff-plus mono" aria-hidden="true">+</span>
+          <span class="diff-content">
+            <span class="diff-kicker mono">
+              <span class="diff-tick" aria-hidden="true"></span>
+              <span class="diff-desk">{verticalLabel(leadVertical)}</span>
+              <span class="diff-flag">· lead</span>
             </span>
-            <h2 id="lead-title" class="lead-title">{lead.data.title}</h2>
-            <p class="lead-dek">{lead.data.description}</p>
-            <span class="lead-meta mono">
+            <h2 id="lead-title" class="diff-title">{lead.data.title}</h2>
+            <p class="diff-dek">{lead.data.description}</p>
+            <span class="diff-meta mono">
               <time datetime={lead.data.pubDate.toISOString()}>{lead.data.pubDate.toISOString().slice(0, 10)}</time>
-              <span aria-hidden="true">·</span>
+              <span aria-hidden="true"> · </span>
               <span>{leadRt}</span>
+              <span aria-hidden="true"> → </span>
+              <span class="diff-read">read post</span>
             </span>
-          </a>
-        </section>
-      </>
+          </span>
+        </a>
+      </section>
     )}
 
     <hr class="hairline" />
 
-    {/* Stratum 1 — ON THE BOARD (series in progress). */}
+    {/* ── C. STACK_DEPTH — signature module ───────────────────────────── */}
+    <section class="stratum" aria-labelledby="s-stack">
+      <h2 id="s-stack" class="stratum-h mono">$ cat STACK_DEPTH</h2>
+      <StackDepth />
+    </section>
+
+    <hr class="hairline" />
+
+    {/* ── D. ON THE BOARD — active series ─────────────────────────────── */}
     {inProgress.length > 0 && (
       <section class="stratum stratum-progress" aria-labelledby="s-progress">
-        <h2 id="s-progress" class="stratum-h mono">On the board</h2>
+        <h2 id="s-progress" class="stratum-h mono">$ git log --threads</h2>
         <ul class="progress-list">
           {inProgress.map((s) => (
             <li class="progress-row">
               <a class="progress-link" href={`/series/${s.slug}/`}>
                 <span class="progress-name">{s.name}</span>
-                <span class="progress-meta mono">part {s.published} of {s.total}</span>
+                <span class="progress-meta mono">part {s.published} / {s.total}</span>
                 <span class="progress-spine-mount">
-                  <SeriesSpine
-                    total={s.total}
-                    published={s.published}
-                    current={s.current}
-                    size="md"
-                  />
+                  <SeriesSpine total={s.total} published={s.published} current={s.current} size="md" />
                 </span>
                 <span class="progress-ago mono">{ago(s.latest)}</span>
               </a>
@@ -190,52 +191,57 @@ const jsonLd = {
 
     <hr class="hairline" />
 
-    {/* Stratum 2 — SHEET INDEX (recent posts). */}
+    {/* ── E. SHEET INDEX — recent posts as numbered register rows ──────── */}
     <section class="stratum stratum-recent" aria-labelledby="s-recent">
-      <h2 id="s-recent" class="stratum-h mono">Sheet index</h2>
-      <ul class="recent-list">
-        {recentPosts.map((p) => (
-          <li class="recent-row" data-vertical={postVertical(p)}>
-            <a class="recent-link" href={`/blog/${p.id}`}>
-              <time class="recent-date mono" datetime={p.data.pubDate.toISOString()}>
+      <h2 id="s-recent" class="stratum-h mono">$ ls -lt ./posts/ | head -8</h2>
+      <ol class="register-list" start={2}>
+        {recentPosts.map((p, i) => (
+          <li class="register-row" data-vertical={postVertical(p)}>
+            <a class="register-link" href={`/blog/${p.id}`}>
+              <span class="register-n mono">{String(i + 2).padStart(2, '0')}</span>
+              <span class="register-meat">
+                <span class="register-kicker mono">
+                  <span class="register-tick" aria-hidden="true"></span>{verticalLabel(postVertical(p))}
+                </span>
+                <span class="register-title">{p.data.title}</span>
+              </span>
+              <time class="register-date mono" datetime={p.data.pubDate.toISOString()}>
                 {p.data.pubDate.toISOString().slice(0, 10)}
               </time>
-              <span class="recent-meat">
-                <span class="recent-kicker mono">
-                  <span class="recent-tick" aria-hidden="true"></span>{verticalLabel(postVertical(p))}
-                </span>
-                <span class="recent-title">{p.data.title}</span>
-                <span class="recent-dek">{p.data.description}</span>
-              </span>
-              <span class="recent-rt mono">{p.data.readingTime ?? readingTimeFor(p)}</span>
+              <span class="register-rt mono">{p.data.readingTime ?? readingTimeFor(p)}</span>
             </a>
           </li>
         ))}
-      </ul>
-      <p class="all-link">
-        <a href="/archive/">full sheet index — all {allPosts.length} posts →</a>
+      </ol>
+      <p class="all-link mono">
+        <a href="/archive/">$ ls -la ./posts/ # all {allPosts.length} entries →</a>
       </p>
     </section>
 
     <hr class="hairline" />
 
-    {/* Stratum 3 — BY DISCIPLINE (single typographic row). */}
+    {/* ── F. ls ./topics/ — categories as shell scan output ────────────── */}
     {cats.length > 0 && (
-      <section class="stratum stratum-cats" aria-labelledby="s-cats">
-        <h2 id="s-cats" class="stratum-h mono">By discipline</h2>
-        <p class="cats-row">
-          {cats.map((c, i) => (
-            <>
-              {i > 0 && <span class="cats-dot" aria-hidden="true">·</span>}
-              <a href={`/categories/${slugifyTag(c.category)}/`} class="cats-link" data-vertical={verticalFor(c.category)}>
-                <span class="cats-name">{c.category}</span>
-                <span class="cats-count mono">({c.count})</span>
+      <section class="stratum stratum-topics" aria-labelledby="s-topics">
+        <h2 id="s-topics" class="stratum-h mono">$ ls ./topics/</h2>
+        <ul class="topics-grid">
+          {cats.map((c) => (
+            <li>
+              <a
+                class="topic-entry"
+                href={`/categories/${slugifyTag(c.category)}/`}
+                data-vertical={verticalFor(c.category)}
+              >
+                <span class="topic-icon mono" aria-hidden="true">./</span>
+                <span class="topic-name">{c.category}</span>
+                <span class="topic-count mono">{c.count}</span>
               </a>
-            </>
+            </li>
           ))}
-        </p>
+        </ul>
       </section>
     )}
+
   </div>
 </BaseLayout>
 
@@ -244,134 +250,210 @@ const jsonLd = {
     max-width: 880px;
     margin-inline: auto;
     padding-inline: clamp(1.25rem, 4vw, 2.5rem);
-    padding-block: clamp(2rem, 6vw, 4rem) 0;
+    padding-block: clamp(1.5rem, 4vw, 2.5rem) 0;
   }
 
-  /* ── Hero (thesis, left column) ───────────────────────────────────── */
+  /* ── A. Title block ─────────────────────────────────────────────────── */
 
-  .hero {
-    padding-bottom: 2rem;
+  .titleblock {
+    padding-bottom: 1.75rem;
     border-bottom: 2px solid var(--ink);
+    position: relative;
   }
-  .hero-tab {
-    display: inline-block;
+  /* registration cross-hair top-right */
+  .titleblock::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--rule-strong);
+    border-left: 0;
+    border-bottom: 0;
+    pointer-events: none;
+  }
+
+  .tb-reg {
     font-size: 10px;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--paper);
-    background: var(--ink);
-    padding: 0.3rem 0.7rem;
-    margin: 0 0 1.5rem;
+    color: var(--ink-mute);
+    margin: 0 0 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
   }
-  .hero-thesis {
+  .tb-dwg { color: var(--blueprint); font-weight: 500; }
+  .tb-sep { color: var(--rule-strong); }
+  .tb-sheets { color: var(--accent); }
+
+  .tb-title {
     font-family: var(--font-display);
-    font-size: clamp(2.75rem, 8vw, 4.5rem);
+    font-size: clamp(3rem, 9vw, 5.5rem);
     font-weight: 700;
     letter-spacing: -0.04em;
-    line-height: 0.98;
+    line-height: 0.95;
     color: var(--ink);
-    margin: 0;
-    max-width: 12ch;
+    margin: 0 0 1.25rem;
   }
-  .hero-dek {
+
+  .tb-dek {
     font-family: var(--font-body);
-    font-size: clamp(1.0625rem, 2vw, 1.25rem);
+    font-size: clamp(1rem, 1.8vw, 1.1875rem);
     line-height: 1.55;
     color: var(--ink-mute);
-    margin: 1.25rem 0 1.75rem;
-    max-width: 54ch;
+    margin: 0 0 1.5rem;
+    max-width: 52ch;
   }
-  .hero-fields {
+  .tb-br { display: none; }
+  @media (min-width: 640px) { .tb-br { display: inline; } }
+
+  .tb-fields {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     border-top: 1px solid var(--rule-strong);
     border-left: 1px solid var(--rule-strong);
+    font-size: 10px;
   }
-  .hero-field {
-    padding: 0.7rem 0.9rem;
+  .tb-field {
+    padding: 0.6rem 0.75rem;
     border-right: 1px solid var(--rule-strong);
     border-bottom: 1px solid var(--rule-strong);
   }
-  .hero-field dt {
+  .tb-field dt {
     font-size: 9px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--ink-mute);
     margin: 0 0 0.2rem;
   }
-  .hero-field dd {
-    font-size: 12.5px;
-    letter-spacing: 0.02em;
+  .tb-field dd {
+    letter-spacing: 0.04em;
     color: var(--ink);
     margin: 0;
   }
-  .hero-field .count { color: var(--accent); font-weight: 500; }
+  .tb-live { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .tb-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    flex: 0 0 auto;
+  }
+  .tb-field a { color: var(--ink); border-bottom: 1px solid var(--rule-strong); }
+  .tb-field a:hover { color: var(--accent); border-color: var(--accent); }
+
   @media (max-width: 560px) {
-    .hero-fields { grid-template-columns: repeat(2, 1fr); }
+    .tb-fields { grid-template-columns: repeat(2, 1fr); }
   }
 
-  /* ── Lead story ────────────────────────────────────────────────────── */
+  /* ── B. Lead diff ───────────────────────────────────────────────────── */
 
-  .lead {
+  .lead-diff {
     --v: var(--v-personal);
-    padding-block: 1.75rem 0.5rem;
+    padding-block: 1.5rem 1rem;
   }
-  .lead[data-vertical='dev'] { --v: var(--v-dev); }
-  .lead[data-vertical='finance'] { --v: var(--v-finance); }
-  .lead[data-vertical='culture'] { --v: var(--v-culture); }
-  .lead[data-vertical='health'] { --v: var(--v-health); }
-  .lead-link { display: grid; gap: 0.625rem; color: var(--ink); text-decoration: none; }
-  .lead-kicker {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute);
+  .lead-diff[data-vertical='dev']     { --v: var(--v-dev); }
+  .lead-diff[data-vertical='finance'] { --v: var(--v-finance); }
+  .lead-diff[data-vertical='culture'] { --v: var(--v-culture); }
+  .lead-diff[data-vertical='health']  { --v: var(--v-health); }
+
+  .diff-hunk {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--blueprint);
+    background: color-mix(in oklab, var(--blueprint) 7%, transparent);
+    border: 1px solid color-mix(in oklab, var(--blueprint) 20%, transparent);
+    padding: 0.3rem 0.75rem;
+    margin-bottom: 0.625rem;
+    display: inline-block;
   }
-  .lead-tick { width: 8px; height: 8px; background: var(--v); flex: 0 0 auto; }
-  .lead-desk { color: var(--v); font-weight: 500; }
-  .lead-flag { border-left: 1px solid var(--rule); padding-left: 0.5rem; color: var(--accent); }
-  .lead-title {
+  .diff-hunk-header { color: var(--blueprint); }
+
+  .diff-body {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    gap: 0.875rem;
+    align-items: start;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.875rem 0.75rem;
+    margin-inline: -0.75rem;
+    border-left: 3px solid color-mix(in oklab, var(--v) 40%, transparent);
+    background: color-mix(in oklab, var(--v) 4%, transparent);
+    transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+  }
+  .diff-body:hover {
+    border-left-color: var(--v);
+    background: color-mix(in oklab, var(--v) 8%, transparent);
+  }
+  .diff-plus {
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--success);
+    font-weight: 700;
+    margin-top: 0.1rem;
+  }
+  .diff-content { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+  .diff-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .diff-tick { width: 7px; height: 7px; background: var(--v); flex: 0 0 auto; }
+  .diff-desk { color: var(--v); font-weight: 500; }
+  .diff-flag { color: var(--accent); border-left: 1px solid var(--rule); padding-left: 0.4rem; }
+  .diff-title {
     font-family: var(--font-display);
-    font-size: clamp(1.875rem, 4.5vw, 2.75rem);
+    font-size: clamp(1.625rem, 3.5vw, 2.25rem);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 1.08;
+    line-height: 1.1;
     margin: 0;
-    max-width: 20ch;
+    max-width: 22ch;
+    color: var(--ink);
   }
-  .lead-link:hover .lead-title { color: var(--accent); }
-  .lead-dek {
-    font-family: var(--font-display);
-    font-size: 1.125rem;
+  .diff-body:hover .diff-title { color: var(--accent); }
+  .diff-dek {
+    font-family: var(--font-body);
+    font-size: 1.0625rem;
     line-height: 1.5;
     color: var(--ink-mute);
     margin: 0;
     max-width: 58ch;
   }
-  .lead-meta { display: inline-flex; gap: 0.5rem; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-mute); }
-
-  /* ── Strata ────────────────────────────────────────────────────────── */
-
-  .stratum { padding-block: 1.75rem 1.75rem; }
-  .stratum-h {
-    font-family: var(--font-mono);
+  .diff-meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
     font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.06em;
     color: var(--ink-mute);
+  }
+  .diff-read { color: var(--accent); }
+
+  /* ── C. Strata shared ───────────────────────────────────────────────── */
+
+  .stratum { padding-block: 1.5rem 1.5rem; }
+  .stratum-h {
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0.06em;
+    color: var(--blueprint);
     font-weight: 500;
-    margin: 0 0 1.25rem;
+    margin: 0 0 1rem;
   }
 
-  /* ── In progress ──────────────────────────────────────────────────── */
+  /* ── D. Threads (series in progress) ───────────────────────────────── */
 
-  .progress-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625rem;
-  }
-  .progress-row { padding: 0; }
+  .progress-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
   .progress-link {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto auto;
@@ -379,17 +461,16 @@ const jsonLd = {
     align-items: baseline;
     color: var(--ink);
     text-decoration: none;
-    padding-block: 0.5rem;
+    padding-block: 0.4rem;
   }
   .progress-link:hover { color: var(--accent); }
   .progress-link:hover .progress-meta,
   .progress-link:hover .progress-ago { color: var(--accent); }
   .progress-name {
     font-family: var(--font-display);
-    font-size: 1.0625rem;
+    font-size: 1rem;
     font-weight: 600;
     letter-spacing: -0.01em;
-    color: var(--ink);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -405,11 +486,8 @@ const jsonLd = {
   @media (max-width: 640px) {
     .progress-link {
       grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        'name      ago'
-        'meta      meta'
-        'spine     spine';
-      row-gap: 0.25rem;
+      grid-template-areas: 'name ago' 'meta meta' 'spine spine';
+      row-gap: 0.2rem;
     }
     .progress-name { grid-area: name; }
     .progress-meta { grid-area: meta; }
@@ -417,160 +495,152 @@ const jsonLd = {
     .progress-ago { grid-area: ago; text-align: right; }
   }
 
-  /* ── Recent ───────────────────────────────────────────────────────── */
+  /* ── E. Register list (numbered recent posts) ───────────────────────── */
 
-  .recent-list {
+  .register-list {
     list-style: none;
     padding: 0;
     margin: 0;
     display: flex;
     flex-direction: column;
   }
-  .recent-row {
+  .register-row {
     --v: var(--v-personal);
-    border-bottom: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
+    border-bottom: 1px solid color-mix(in oklab, var(--rule) 60%, transparent);
   }
-  .recent-row[data-vertical='dev'] { --v: var(--v-dev); }
-  .recent-row[data-vertical='finance'] { --v: var(--v-finance); }
-  .recent-row[data-vertical='culture'] { --v: var(--v-culture); }
-  .recent-row[data-vertical='health'] { --v: var(--v-health); }
-  .recent-row:last-child { border-bottom: 0; }
-  .recent-link {
+  .register-row[data-vertical='dev']     { --v: var(--v-dev); }
+  .register-row[data-vertical='finance'] { --v: var(--v-finance); }
+  .register-row[data-vertical='culture'] { --v: var(--v-culture); }
+  .register-row[data-vertical='health']  { --v: var(--v-health); }
+  .register-row:last-child { border-bottom: 0; }
+
+  .register-link {
     display: grid;
-    grid-template-columns: 100px minmax(0, 1fr) auto;
-    gap: 1.25rem;
+    grid-template-columns: 2rem minmax(0, 1fr) 6.5rem 4.5rem;
+    gap: 0.875rem;
     align-items: baseline;
     color: var(--ink);
     text-decoration: none;
-    padding-block: 0.875rem;
-    padding-left: 0.75rem;
-    margin-left: -0.75rem;
+    padding-block: 0.75rem;
+    padding-left: 0.5rem;
+    margin-left: -0.5rem;
     border-left: 2px solid transparent;
-    transition: border-color var(--dur-fast, 120ms) ease;
+    transition: border-color var(--dur-fast) ease;
   }
-  .recent-link:hover { border-left-color: var(--v); }
-  .recent-link:hover .recent-title { color: var(--accent); }
-  .recent-link:hover .recent-date,
-  .recent-link:hover .recent-rt { color: var(--accent); }
+  .register-link:hover { border-left-color: var(--v); }
+  .register-link:hover .register-title { color: var(--accent); }
+  .register-link:hover .register-date,
+  .register-link:hover .register-rt { color: var(--accent); }
 
-  .recent-kicker {
+  .register-n {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ink-mute);
+    padding-top: 0.1em;
+    align-self: start;
+  }
+  .register-meat { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+  .register-kicker {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.3rem;
     font-size: 10px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--v);
     font-weight: 500;
   }
-  .recent-tick { width: 6px; height: 6px; background: var(--v); flex: 0 0 auto; }
-
-  .recent-date {
-    color: var(--ink-mute);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    position: relative;
-    padding-left: 0.875rem;
-  }
-  /* dateline gutter: coral tick marks the wire-feed timestamp */
-  .recent-date::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0.12em;
-    width: 3px;
-    height: 0.7em;
-    background: var(--cobalt);
-  }
-  .recent-meat {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-    min-width: 0;
-  }
-  .recent-title {
+  .register-tick { width: 5px; height: 5px; background: var(--v); flex: 0 0 auto; }
+  .register-title {
     font-family: var(--font-display);
-    font-size: 1.125rem;
     font-weight: 600;
+    font-size: 1.0625rem;
     letter-spacing: -0.01em;
+    line-height: 1.25;
     color: var(--ink);
-    line-height: 1.3;
   }
-  .recent-dek {
-    font-family: var(--font-body);
-    font-size: 14.5px;
-    color: var(--ink-mute);
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-  }
-  .recent-rt {
-    color: var(--ink-mute);
-    font-family: var(--font-mono);
+  .register-date, .register-rt {
     font-size: 11px;
     letter-spacing: 0.04em;
+    color: var(--ink-mute);
     white-space: nowrap;
   }
 
   @media (max-width: 640px) {
-    .recent-link {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        'date   rt'
-        'meat   meat';
-      row-gap: 0.25rem;
+    .register-link {
+      grid-template-columns: 2rem minmax(0, 1fr) auto;
+      grid-template-areas: 'n meat date' '. meat rt';
+      row-gap: 0;
     }
-    .recent-date { grid-area: date; }
-    .recent-rt { grid-area: rt; text-align: right; }
-    .recent-meat { grid-area: meat; }
+    .register-n { grid-area: n; }
+    .register-meat { grid-area: meat; grid-row: 1 / span 2; }
+    .register-date { grid-area: date; }
+    .register-rt { grid-area: rt; text-align: right; }
   }
 
   .all-link {
-    margin: 1.25rem 0 0;
-    font-family: var(--font-sans);
-    font-size: 13.6px;
+    margin: 1rem 0 0;
+    font-size: 12px;
+    letter-spacing: 0.04em;
   }
   .all-link a {
     color: var(--ink-mute);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    text-decoration-color: var(--rule);
-  }
-  .all-link a:hover { color: var(--accent); text-decoration-color: var(--accent); }
-
-  /* ── By category (one row) ────────────────────────────────────────── */
-
-  .cats-row {
-    margin: 0;
-    line-height: 2;
-    color: var(--ink);
-  }
-  .cats-link {
-    --v: var(--v-personal);
-    color: var(--ink);
     text-decoration: none;
-    margin-inline: 0.125rem;
+    border-bottom: 1px solid var(--rule);
   }
-  .cats-link[data-vertical='dev'] { --v: var(--v-dev); }
-  .cats-link[data-vertical='finance'] { --v: var(--v-finance); }
-  .cats-link[data-vertical='culture'] { --v: var(--v-culture); }
-  .cats-link[data-vertical='health'] { --v: var(--v-health); }
-  .cats-link:hover .cats-name { color: var(--v); }
-  .cats-name {
-    font-family: var(--font-display);
-    font-size: 17px;
-    font-weight: 500;
-    letter-spacing: -0.01em;
+  .all-link a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── F. Topics grid ────────────────────────────────────────────────── */
+
+  .topics-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.375rem;
   }
-  .cats-count {
+  .topic-entry {
+    --v: var(--v-personal);
+    display: grid;
+    grid-template-columns: 1.5rem 1fr auto;
+    align-items: baseline;
+    gap: 0.25rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--rule);
+    text-decoration: none;
+    color: var(--ink);
+    transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+  }
+  .topic-entry[data-vertical='dev']     { --v: var(--v-dev); }
+  .topic-entry[data-vertical='finance'] { --v: var(--v-finance); }
+  .topic-entry[data-vertical='culture'] { --v: var(--v-culture); }
+  .topic-entry[data-vertical='health']  { --v: var(--v-health); }
+  .topic-entry:hover {
+    border-color: var(--v);
+    background: color-mix(in oklab, var(--v) 6%, transparent);
+  }
+  .topic-icon {
+    font-size: 10px;
+    letter-spacing: 0;
     color: var(--ink-mute);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    margin-left: 0.25rem;
   }
-  .cats-dot { color: var(--rule); margin-inline: 0.625rem; }
+  .topic-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topic-entry:hover .topic-name { color: var(--v); }
+  .topic-count {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--ink-mute);
+    background: var(--paper-2);
+    padding: 0 0.3rem;
+    border: 1px solid var(--rule);
+  }
 </style>

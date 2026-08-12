@@ -1,27 +1,30 @@
 ---
 /**
- * PostCard — a drawing-sheet ledger row for the left-sidebar shell.
+ * PostCard — a register-row entry for the blog index.
  *
- * Distinct from the sibling "kicker-rule" card: each entry is framed like a
- * sheet in a drawing register — a mono sheet-tab on the left (date + desk),
- * a Space Grotesk headline + dek in the middle, and a discipline tick. The
- * whole row is boxed on hover like a selected drawing. No shadow, no radius.
+ * Tech-niche treatment: each entry has a line-number gutter (like an IDE),
+ * a mono date + vertical kicker, and a subtle diff-style left border that
+ * activates on hover in the vertical's colour. No radius, no shadow.
  */
 import type { CollectionEntry } from 'astro:content'
 import { formatPostDate, postVertical, slugifyTag, verticalLabel } from '~/lib/blog'
 
 export interface Props {
   post: CollectionEntry<'blog'>
+  lineNumber?: number
 }
 
-const { post } = Astro.props
+const { post, lineNumber } = Astro.props
 const { title, description, pubDate, category, readingTime } = post.data
 const href = `/blog/${post.id}`
 const vert = postVertical(post)
 ---
 
-<article class="sheet" data-vertical={vert}>
+<article class="post-card sheet" data-vertical={vert}>
   <a class="sheet-link" href={href}>
+    {lineNumber !== undefined && (
+      <span class="sheet-gutter mono" aria-hidden="true">{String(lineNumber).padStart(3, ' ')}</span>
+    )}
     <span class="sheet-tab mono">
       <time datetime={pubDate.toISOString()}>{formatPostDate(pubDate)}</time>
       <span class="sheet-desk">{verticalLabel(vert)}</span>
@@ -43,10 +46,10 @@ const vert = postVertical(post)
     --v: var(--v-personal);
     border-top: 1px solid var(--rule);
   }
-  .sheet[data-vertical='dev'] { --v: var(--v-dev); }
+  .sheet[data-vertical='dev']     { --v: var(--v-dev); }
   .sheet[data-vertical='finance'] { --v: var(--v-finance); }
   .sheet[data-vertical='culture'] { --v: var(--v-culture); }
-  .sheet[data-vertical='health'] { --v: var(--v-health); }
+  .sheet[data-vertical='health']  { --v: var(--v-health); }
 
   .sheet-link {
     display: grid;
@@ -57,14 +60,29 @@ const vert = postVertical(post)
     margin-inline: -0.75rem;
     text-decoration: none;
     color: var(--ink);
-    border: 1px solid transparent;
+    border-left: 3px solid transparent;
     transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease;
   }
+  /* when line number gutter is shown, extend columns */
+  .sheet-link:has(.sheet-gutter) {
+    grid-template-columns: 2.25rem 8.5rem minmax(0, 1fr) 6px;
+  }
+
   .sheet-link:hover {
     background: color-mix(in oklab, var(--v) 6%, transparent);
-    border-color: color-mix(in oklab, var(--v) 30%, transparent);
+    border-left-color: var(--v);
   }
   .sheet-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .sheet-gutter {
+    font-size: 11px;
+    letter-spacing: 0;
+    color: var(--rule-strong);
+    text-align: right;
+    padding-top: 0.15rem;
+    user-select: none;
+  }
+  .sheet-link:hover .sheet-gutter { color: var(--ink-mute); }
 
   .sheet-tab {
     display: flex;
@@ -127,10 +145,12 @@ const vert = postVertical(post)
   .sheet-link:hover .sheet-tick { background: var(--v); }
 
   @media (max-width: 560px) {
-    .sheet-link {
+    .sheet-link,
+    .sheet-link:has(.sheet-gutter) {
       grid-template-columns: minmax(0, 1fr) 6px;
       gap: 0.75rem;
     }
+    .sheet-gutter { display: none; }
     .sheet-tab {
       flex-direction: row;
       gap: 0.5rem;

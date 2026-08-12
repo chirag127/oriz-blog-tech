@@ -1,0 +1,142 @@
+---
+/**
+ * StackDepth — a tech-blog signature module.
+ *
+ * Renders a "stack depth" panel: each layer of the stack shown as a numbered
+ * register row with a filled bar (0–100 depth) and a label. Styled like an
+ * oscilloscope trace or a register dump — purely CSS, no JS, no images.
+ *
+ * Usage: drop onto the homepage below the lead story.
+ */
+
+interface StackLayer {
+  n: string    // register prefix, e.g. "0x00"
+  label: string
+  depth: number  // 0–100
+  note: string
+}
+
+const layers: StackLayer[] = [
+  { n: '0x00', label: 'Systems',       depth: 72, note: 'distributed, OS, networking' },
+  { n: '0x01', label: 'Backend',       depth: 88, note: 'APIs, DB, auth, queues' },
+  { n: '0x02', label: 'Frontend',      depth: 81, note: 'Astro, React, CSS, perf' },
+  { n: '0x03', label: 'AI / Agents',   depth: 65, note: 'LLM tooling, MCP, evals' },
+  { n: '0x04', label: 'Infra / Cloud', depth: 74, note: 'CF, Neon, Wrangler, CI' },
+  { n: '0x05', label: 'Tooling',       depth: 90, note: 'CLIs, DX, build pipelines' },
+]
+---
+
+<aside class="stack-depth" aria-label="Stack depth register">
+  <p class="sd-label mono">STACK_DEPTH_REGISTER :: read-only</p>
+  <ul class="sd-rows">
+    {layers.map((l) => (
+      <li class="sd-row">
+        <span class="sd-addr mono">{l.n}</span>
+        <span class="sd-name">{l.label}</span>
+        <span class="sd-bar-wrap" aria-hidden="true">
+          <span class="sd-bar" style={`--fill: ${l.depth}%`}></span>
+        </span>
+        <span class="sd-val mono" aria-label={`${l.depth} of 100`}>{String(l.depth).padStart(3, '0')}</span>
+        <span class="sd-note mono">{l.note}</span>
+      </li>
+    ))}
+  </ul>
+</aside>
+
+<style>
+  .stack-depth {
+    border: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--blueprint);
+    background: color-mix(in oklab, var(--paper-2) 60%, var(--paper));
+    padding: 1rem 1.25rem 0.875rem;
+  }
+
+  .sd-label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--blueprint);
+    margin: 0 0 0.75rem;
+  }
+
+  .sd-rows {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.425rem;
+  }
+
+  .sd-row {
+    display: grid;
+    grid-template-columns: 3.5rem 7rem 1fr 2.25rem minmax(0, 16rem);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sd-addr {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--ink-mute);
+  }
+
+  .sd-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .sd-bar-wrap {
+    height: 8px;
+    background: var(--rule);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sd-bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--fill, 0%);
+    background: var(--blueprint);
+    transition: width var(--dur-slow) var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sd-bar { transition: none; }
+  }
+
+  .sd-val {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    text-align: right;
+  }
+
+  .sd-note {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--ink-mute);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* mobile: collapse note column */
+  @media (max-width: 700px) {
+    .sd-row {
+      grid-template-columns: 3rem 6rem 1fr 2rem;
+    }
+    .sd-note { display: none; }
+  }
+
+  @media (max-width: 480px) {
+    .sd-row {
+      grid-template-columns: 3rem minmax(0, 1fr) 1fr 2rem;
+    }
+    .sd-name { font-size: 0.8125rem; }
+  }
+</style>
