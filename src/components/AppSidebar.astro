@@ -1,0 +1,412 @@
+---
+/*
+ * AppSidebar — the fixed left rail that IS this site's chrome.
+ *
+ * No top header bar anywhere. This vertical rail carries: the "Blueprint"
+ * brand cartouche at the top, a vertical nav (numbered like drawing sheets),
+ * the search + theme controls, and a title-block meta panel pinned to the
+ * bottom. On <1024px it collapses to a slim top bar with a hamburger that
+ * slides the same rail in as a drawer.
+ *
+ * Search + theme MECHANISM is unchanged — the ⌘K Pagefind modal + theme
+ * picker live in HeaderControls.tsx, mounted here in the rail instead of a
+ * header.
+ */
+import HeaderControls from '~/components/HeaderControls.tsx'
+
+const path = Astro.url.pathname
+const isActive = (href: string) =>
+  href === '/' ? path === '/' : path.startsWith(href)
+
+const nav = [
+  { n: '01', label: 'Index', href: '/' },
+  { n: '02', label: 'Sheets', href: '/blog/' },
+  { n: '03', label: 'Series', href: '/series/' },
+  { n: '04', label: 'Tags', href: '/tags/' },
+  { n: '05', label: 'Archive', href: '/archive/' },
+  { n: '06', label: 'About', href: '/about/' },
+]
+---
+
+{/* checkbox drives the mobile drawer without a JS framework */}
+<input type="checkbox" id="rail-toggle" class="rail-toggle" hidden aria-controls="app-rail" />
+
+{/* mobile-only top strip: brand + hamburger. Hidden ≥1024px. */}
+<div class="rail-topbar">
+  <a class="rail-topbrand" href="/" aria-label="Blueprint — home">
+    <span class="rail-glyph" aria-hidden="true">⌗</span>
+    <span class="rail-topname">Blueprint</span>
+  </a>
+  <button
+    type="button"
+    class="rail-burger"
+    data-rail-toggle
+    aria-label="Open navigation"
+    aria-controls="app-rail"
+    aria-expanded="false"
+  >
+    <span></span><span></span><span></span>
+  </button>
+</div>
+
+<button type="button" class="rail-scrim" data-rail-close aria-label="Close navigation"></button>
+
+<aside id="app-rail" class="app-rail" aria-label="Site navigation">
+  <button type="button" class="rail-close" data-rail-close aria-label="Close navigation">Close</button>
+
+  {/* Brand cartouche — a boxed title block, the drafting-sheet nameplate. */}
+  <a class="rail-brand" href="/" aria-label="Blueprint — home">
+    <span class="rail-brand-mark" aria-hidden="true">
+      <span class="rail-glyph">⌗</span>
+    </span>
+    <span class="rail-brand-text">
+      <span class="rail-brand-name">Blueprint</span>
+      <span class="rail-brand-sub mono">field notebook</span>
+    </span>
+  </a>
+
+  <p class="rail-thesis">Software, drawn to scale.</p>
+
+  {/* Vertical nav — sheet-numbered rows. */}
+  <nav class="rail-nav" aria-label="Primary">
+    {nav.map((item) => (
+      <a
+        href={item.href}
+        class:list={['rail-link', isActive(item.href) && 'is-active']}
+        aria-current={isActive(item.href) ? 'page' : undefined}
+      >
+        <span class="rail-link-n mono">{item.n}</span>
+        <span class="rail-link-label">{item.label}</span>
+      </a>
+    ))}
+  </nav>
+
+  {/* Controls — search (⌘K) + theme, mounted in the rail (no header). */}
+  <div class="rail-controls">
+    <HeaderControls client:idle />
+  </div>
+
+  {/* Title-block meta — pinned to the foot of the rail. */}
+  <dl class="rail-meta mono">
+    <div class="rail-meta-row">
+      <dt>Drawn by</dt>
+      <dd>Chirag Singhal</dd>
+    </div>
+    <div class="rail-meta-row">
+      <dt>Feed</dt>
+      <dd><a href="/rss.xml">rss</a></dd>
+    </div>
+    <div class="rail-meta-row">
+      <dt>Family</dt>
+      <dd><a href="https://oriz.in">oriz.in</a></dd>
+    </div>
+    <div class="rail-meta-row">
+      <dt>Source</dt>
+      <dd><a href="https://github.com/chirag127/oriz-blog-tech">github</a></dd>
+    </div>
+  </dl>
+</aside>
+
+<script>
+  const input = document.querySelector<HTMLInputElement>('#rail-toggle')
+  const triggers = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-rail-toggle]'))
+  if (input && triggers.length > 0) {
+    let returnFocus: HTMLElement | null = null
+    const mobileQuery = window.matchMedia('(max-width: 1023px)')
+    const rail = document.querySelector<HTMLElement>('#app-rail')
+    const sync = () => {
+      const open = input.checked
+      document.documentElement.dataset.railOpen = open ? 'true' : 'false'
+      if (rail && mobileQuery.matches) {
+        rail.toggleAttribute('inert', !open)
+        rail.setAttribute('aria-hidden', String(!open))
+        document.body.style.overflow = open ? 'hidden' : ''
+      } else if (rail) {
+        rail.removeAttribute('inert')
+        rail.removeAttribute('aria-hidden')
+        document.body.style.overflow = ''
+      }
+      triggers.forEach((t) => {
+        t.setAttribute('aria-expanded', String(open))
+        t.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation')
+      })
+      if (open) {
+        returnFocus = document.activeElement as HTMLElement | null
+        rail?.querySelector<HTMLElement>('a, button:not([data-rail-close])')?.focus()
+      } else {
+        returnFocus?.focus()
+        returnFocus = null
+      }
+    }
+    const toggle = () => {
+      input.checked = !input.checked
+      sync()
+    }
+    const close = () => {
+      if (!input.checked) return
+      input.checked = false
+      sync()
+    }
+    triggers.forEach((t) => t.addEventListener('click', toggle))
+    document.querySelectorAll<HTMLElement>('[data-rail-close]').forEach((c) => c.addEventListener('click', close))
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && input.checked) { close(); return }
+      if (e.key !== 'Tab' || !input.checked || !rail) return
+      const focusable = Array.from(
+        rail.querySelectorAll<HTMLElement>('a, button, [data-rail-close]'),
+      ).filter((el) => !el.hasAttribute('disabled'))
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    })
+    mobileQuery.addEventListener('change', sync)
+    document.addEventListener('astro:before-preparation', () => { input.checked = false })
+    sync()
+  }
+</script>
+
+<style>
+  .rail-toggle { position: absolute; opacity: 0; pointer-events: none; }
+
+  /* ── The rail ─────────────────────────────────────────────────────── */
+  .app-rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--rail-w, 288px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: clamp(1.5rem, 2.2vw, 2rem) clamp(1.25rem, 1.8vw, 1.75rem);
+    background: var(--paper-2);
+    /* the rail is a title-block: a heavy blueprint-navy border on the seam */
+    border-right: 2px solid var(--rule-strong);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* corner registration tick — the drafting cross-hair, top-left of the rail */
+  .app-rail::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--accent);
+    border-right: 0;
+    border-bottom: 0;
+    pointer-events: none;
+  }
+
+  /* ── Brand cartouche ──────────────────────────────────────────────── */
+  .rail-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: var(--ink);
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--ink);
+  }
+  .rail-brand-mark {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    background: var(--ink);
+    color: var(--paper);
+    border: 2px solid var(--ink);
+  }
+  .rail-glyph {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .rail-brand-mark .rail-glyph { color: var(--paper); }
+  .rail-brand-text { display: flex; flex-direction: column; gap: 2px; }
+  .rail-brand-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.375rem;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .rail-brand-sub {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  .rail-thesis {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: -0.01em;
+    color: var(--ink-mute);
+    margin: 1rem 0 1.25rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--accent);
+  }
+
+  /* ── Vertical nav ─────────────────────────────────────────────────── */
+  .rail-nav { display: flex; flex-direction: column; }
+  .rail-link {
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.6rem 0.5rem;
+    color: var(--ink);
+    text-decoration: none;
+    border-top: 1px solid var(--rule);
+    transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+  }
+  .rail-nav .rail-link:last-child { border-bottom: 1px solid var(--rule); }
+  .rail-link-n {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ink-mute);
+  }
+  .rail-link-label {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    letter-spacing: -0.01em;
+  }
+  .rail-link:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--accent); }
+  .rail-link:hover .rail-link-n { color: var(--accent); }
+  .rail-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .rail-link.is-active { color: var(--accent); background: color-mix(in oklab, var(--accent) 6%, transparent); }
+  .rail-link.is-active .rail-link-n { color: var(--accent); }
+  .rail-link.is-active .rail-link-label { position: relative; }
+  .rail-link.is-active .rail-link-n::before {
+    content: '▸';
+    margin-right: 2px;
+  }
+
+  /* ── Controls (search + theme) ────────────────────────────────────── */
+  .rail-controls {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ── Title-block meta (pinned foot) ───────────────────────────────── */
+  .rail-meta {
+    margin: auto 0 0;
+    padding-top: 1.25rem;
+  }
+  .rail-meta-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+    border-top: 1px solid var(--rule);
+    font-size: 11px;
+  }
+  .rail-meta-row dt {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    margin: 0;
+  }
+  .rail-meta-row dd { margin: 0; color: var(--ink); }
+  .rail-meta-row dd a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule-strong); }
+  .rail-meta-row dd a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Mobile top bar + drawer ──────────────────────────────────────── */
+  .rail-topbar { display: none; }
+  .rail-close { display: none; }
+  .rail-scrim { display: none; }
+  .rail-burger { display: none; }
+
+  @media (max-width: 1023px) {
+    .rail-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 45;
+      height: 56px;
+      padding: 0 1rem;
+      background: color-mix(in oklab, var(--paper-2) 92%, transparent);
+      backdrop-filter: saturate(160%) blur(10px);
+      -webkit-backdrop-filter: saturate(160%) blur(10px);
+      border-bottom: 2px solid var(--rule-strong);
+    }
+    .rail-topbrand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--ink);
+    }
+    .rail-topbrand .rail-glyph { font-size: 18px; }
+    .rail-topname {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.125rem;
+      letter-spacing: -0.02em;
+    }
+    .rail-burger {
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      width: 40px;
+      height: 40px;
+      background: transparent;
+      border: 1px solid var(--rule-strong);
+      cursor: pointer;
+    }
+    .rail-burger span { display: block; width: 18px; height: 2px; background: var(--ink); }
+    .rail-burger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .app-rail {
+      transform: translateX(-100%);
+      transition: transform var(--dur-base) var(--ease-out);
+      width: min(320px, 86vw);
+      z-index: 55;
+      padding-top: 2rem;
+    }
+    .rail-toggle:checked ~ .app-rail { transform: translateX(0); }
+    .rail-toggle:checked ~ .rail-scrim,
+    html[data-rail-open='true'] .rail-scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 54;
+      border: 0;
+      padding: 0;
+      appearance: none;
+      background: color-mix(in oklab, var(--ink) 45%, transparent);
+    }
+    .rail-close {
+      display: inline-flex;
+      align-items: center;
+      margin: 0 0 1rem auto;
+      padding: 0.375rem 0.5rem;
+      border: 1px solid var(--rule-strong);
+      background: transparent;
+      color: var(--ink-mute);
+      font: 11px var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+    }
+    .rail-close:hover { color: var(--accent); border-color: var(--accent); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .app-rail { transition: none; }
+  }
+</style>

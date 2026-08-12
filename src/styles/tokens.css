@@ -135,6 +135,9 @@
   --radius-card: 2px;
   --radius-button: 2px;
   --container-page: 1100px;
+
+  /* left-sidebar shell width (rail + content offset agree on this) */
+  --rail-w: 288px;
 }
 
 /* ── DARK — blueprint navy field, unless user forced light ──────────── */

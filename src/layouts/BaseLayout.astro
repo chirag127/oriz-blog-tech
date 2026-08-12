@@ -1,25 +1,23 @@
 ---
 /*
- * BaseLayout — single page shell for every oriz-blog route (v2).
+ * BaseLayout — LEFT-SIDEBAR SHELL for every oriz-blog-tech route.
  *
- * Per-app divergent Header (sweep #5 revert). Footer + Sidebar wrapper +
- * BottomBar structure come from @chirag127/astro-chrome; sidebar slot and
- * bottombar actions are app-specific.
+ * Independent structure: NO top header bar. A fixed vertical rail
+ * (AppSidebar) carries brand + nav + search + meta; page content lives in a
+ * right column offset by the rail width. On <1024px the rail collapses to a
+ * top bar + slide-in drawer. `hideSidebar` is accepted for back-compat but no
+ * longer suppresses the rail — the rail is the site's primary nav on every
+ * page.
  */
 import '~/styles/global.css'
 import '~/styles/oriz-ui-overrides.css'
 import 'katex/dist/katex.min.css'
 import '~/styles/tokens.css'
 import { ClientRouter } from 'astro:transitions'
-import AppSidebarContent from '~/components/AppSidebarContent.astro'
-import BottomBar from '~/components/chrome/BottomBar.astro'
+import AppSidebar from '~/components/AppSidebar.astro'
 import ConsentBanner from '~/components/chrome/ConsentBanner.astro'
-import FamilyChrome from '~/components/chrome/FamilyChrome.astro'
-import Sidebar from '~/components/chrome/Sidebar.astro'
 import FeedDiscovery from '~/components/FeedDiscovery.astro'
 import Footer from '~/components/Footer.astro'
-import Header from '~/components/Header.astro'
-import { bottomBarActions } from '~/data/bottombar-actions'
 
 interface Props {
   title?: string
@@ -35,9 +33,9 @@ interface Props {
 }
 
 const {
-  title = 'oriz / blog',
+  title = 'Blueprint — a software-engineering field notebook',
   description = "An engineer's working notebook. Long-form writing on engineering, finance, and books — by Chirag Singhal.",
-  canonical = `https://blog.oriz.in${Astro.url.pathname}`,
+  canonical = `https://tech-blog.oriz.in${Astro.url.pathname}`,
   noindex = false,
   jsonLd,
   image,
@@ -50,10 +48,9 @@ const {
 const adsenseClient = import.meta.env.PUBLIC_ADSENSE_CLIENT
 const beaconToken = import.meta.env.PUBLIC_CF_BEACON_TOKEN
 const ga4Id = import.meta.env.PUBLIC_GA4_ID
-const ogImage = image ? new URL(image, 'https://blog.oriz.in').toString() : undefined
-const visibleBottomBarActions = hideSidebar
-  ? bottomBarActions.filter((action) => action.label !== 'Menu')
-  : bottomBarActions
+const ogImage = image ? new URL(image, 'https://tech-blog.oriz.in').toString() : undefined
+// hideSidebar retained for API compat; the left rail always renders.
+void hideSidebar
 ---
 
 <!doctype html>
@@ -70,7 +67,7 @@ const visibleBottomBarActions = hideSidebar
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:type" content={type} />
-    <meta property="og:site_name" content="oriz / blog" />
+    <meta property="og:site_name" content="Blueprint" />
     {ogImage && <meta property="og:image" content={ogImage} />}
     {type === 'article' && pubDate && (
       <meta property="article:published_time" content={pubDate.toISOString()} />
@@ -139,15 +136,14 @@ const visibleBottomBarActions = hideSidebar
     )}
   </head>
   <body>
-    <FamilyChrome slug="oriz-pages-blog-app" title="Blog" accent="var(--accent)" />
     <a href="#main" class="skip-link">Skip to content</a>
-    <Header />
-    <div class="layout-body">
-      {!hideSidebar && <Sidebar><AppSidebarContent /></Sidebar>}
-      <main id="main"><slot /></main>
+    <div class="app-shell">
+      <AppSidebar />
+      <div class="app-content">
+        <main id="main"><slot /></main>
+        <Footer />
+      </div>
     </div>
-    <Footer />
-    <BottomBar actions={visibleBottomBarActions} />
     <ConsentBanner />
 
     <script>
@@ -161,9 +157,16 @@ const visibleBottomBarActions = hideSidebar
 </html>
 
 <style>
-  .layout-body { display: flex; gap: 0; align-items: flex-start; }
-  .layout-body > main { flex: 1 1 auto; min-width: 0; }
-  @media (max-width: 767px) {
-    .layout-body { display: block; }
+  /* Left-sidebar shell: fixed rail + offset content column. */
+  .app-shell { min-height: 100vh; }
+  .app-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-width: 0;
+  }
+  .app-content > main { flex: 1 1 auto; min-width: 0; }
+  @media (min-width: 1024px) {
+    .app-content { margin-left: var(--rail-w, 288px); }
   }
 </style>

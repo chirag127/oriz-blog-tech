@@ -104,54 +104,39 @@ const jsonLd = {
 ---
 
 <BaseLayout
-  title="oriz / blog"
+  title="Blueprint — a software-engineering field notebook"
   description={SITE_CONFIG.description}
   jsonLd={jsonLd}
-  hideSidebar
 >
-  <div class="container-page">
-    {/* Title block — the hero rendered as an engineering drawing's cartouche.
-        The big line is the thesis; the mono field row is the drawing's
-        metadata strip (DRAWN BY / SHEET / SCALE / REV). */}
-    <section class="titleblock" aria-label="Masthead">
-      <div class="tb-tab mono">Dwg. no. TB-01 · Field notebook</div>
-      <div class="tb-body">
-        <p class="tb-thesis">Software, drawn to scale.</p>
-        <p class="tb-dek">
-          Working notes from building and running production systems — read like a drawing
-          set: every post a sheet, revised in the open, dimensioned so you can build from it.
-        </p>
-      </div>
-      <dl class="tb-fields mono">
-        <div class="tb-field">
+  <div class="home">
+    {/* Hero = thesis. Left-aligned column, not a full-width masthead. The
+        boxed cartouche belonged to the top-nav template; here the rail is
+        the chrome, so the page opens straight into the argument. */}
+    <section class="hero" aria-label="Masthead">
+      <p class="hero-tab mono">Dwg. no. TB-01 · Field notebook</p>
+      <h1 class="hero-thesis">Software, drawn to scale.</h1>
+      <p class="hero-dek">
+        Working notes from building and running production systems — read like a drawing
+        set: every post a sheet, revised in the open, dimensioned so you can build from it.
+      </p>
+      <dl class="hero-fields mono">
+        <div class="hero-field">
           <dt>Drawn by</dt>
           <dd>Chirag Singhal</dd>
         </div>
-        <div class="tb-field">
+        <div class="hero-field">
           <dt>Sheets</dt>
           <dd><span class="count">{allPosts.length}</span> since 2019</dd>
         </div>
-        <div class="tb-field">
+        <div class="hero-field">
           <dt>Scale</dt>
           <dd>1:1</dd>
         </div>
-        <div class="tb-field">
+        <div class="hero-field">
           <dt>Rev.</dt>
           <dd>{now.getFullYear()}·{String(now.getMonth() + 1).padStart(2, '0')}</dd>
         </div>
       </dl>
-      {inProgress[0] && (
-        <p class="tb-spine">
-          <span class="tb-spine-label mono">On the board</span>
-          <SeriesSpine
-            total={inProgress[0].total}
-            published={inProgress[0].published}
-            current={inProgress[0].current}
-            size="md"
-          />
-          <a class="tb-spine-name" href={`/series/${inProgress[0].slug}/`}>{inProgress[0].name}</a>
-        </p>
-      )}
     </section>
 
     {lead && (
@@ -255,34 +240,20 @@ const jsonLd = {
 </BaseLayout>
 
 <style>
-  .container-page {
-    max-width: 920px;
+  .home {
+    max-width: 880px;
     margin-inline: auto;
-    padding-inline: clamp(1.25rem, 4vw, 2rem);
+    padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+    padding-block: clamp(2rem, 6vw, 4rem) 0;
   }
 
-  /* ── Title block (hero cartouche) ─────────────────────────────────── */
+  /* ── Hero (thesis, left column) ───────────────────────────────────── */
 
-  .titleblock {
-    margin-block: clamp(1.5rem, 5vw, 2.75rem) 1.75rem;
-    border: 2px solid var(--ink);
-    background: color-mix(in oklab, var(--paper) 88%, transparent);
-    position: relative;
+  .hero {
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--ink);
   }
-  /* corner registration ticks — the drafting cross-hairs */
-  .titleblock::before,
-  .titleblock::after {
-    content: '';
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    border: 2px solid var(--accent);
-    pointer-events: none;
-  }
-  .titleblock::before { top: -6px; left: -6px; border-right: 0; border-bottom: 0; }
-  .titleblock::after { bottom: -6px; right: -6px; border-left: 0; border-top: 0; }
-
-  .tb-tab {
+  .hero-tab {
     display: inline-block;
     font-size: 10px;
     letter-spacing: 0.2em;
@@ -290,86 +261,53 @@ const jsonLd = {
     color: var(--paper);
     background: var(--ink);
     padding: 0.3rem 0.7rem;
-    margin: 0;
+    margin: 0 0 1.5rem;
   }
-  .tb-body {
-    padding: clamp(1.25rem, 4vw, 2rem) clamp(1.25rem, 4vw, 2rem) 1.25rem;
-  }
-  .tb-thesis {
+  .hero-thesis {
     font-family: var(--font-display);
-    font-size: clamp(2.5rem, 8vw, 4.75rem);
+    font-size: clamp(2.75rem, 8vw, 4.5rem);
     font-weight: 700;
     letter-spacing: -0.04em;
     line-height: 0.98;
     color: var(--ink);
     margin: 0;
-    max-width: 14ch;
+    max-width: 12ch;
   }
-  .tb-dek {
+  .hero-dek {
     font-family: var(--font-body);
     font-size: clamp(1.0625rem, 2vw, 1.25rem);
     line-height: 1.55;
     color: var(--ink-mute);
-    margin: 1.1rem 0 0;
-    max-width: 56ch;
+    margin: 1.25rem 0 1.75rem;
+    max-width: 54ch;
   }
-  /* field strip — the drawing's metadata row, boxed like a title block */
-  .tb-fields {
+  .hero-fields {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    border-top: 2px solid var(--ink);
-    margin: 0;
+    border-top: 1px solid var(--rule-strong);
+    border-left: 1px solid var(--rule-strong);
   }
-  .tb-field {
-    padding: 0.7rem clamp(0.75rem, 2vw, 1.25rem);
+  .hero-field {
+    padding: 0.7rem 0.9rem;
     border-right: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
   }
-  .tb-field:last-child { border-right: 0; }
-  .tb-field dt {
+  .hero-field dt {
     font-size: 9px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--ink-mute);
     margin: 0 0 0.2rem;
   }
-  .tb-field dd {
+  .hero-field dd {
     font-size: 12.5px;
     letter-spacing: 0.02em;
     color: var(--ink);
     margin: 0;
   }
-  .tb-field .count { color: var(--accent); font-weight: 500; }
-
-  .tb-spine {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.625rem;
-    border-top: 1px solid var(--rule-strong);
-    padding: 0.7rem clamp(1.25rem, 4vw, 2rem);
-    margin: 0;
-  }
-  .tb-spine-label {
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--ink-mute);
-  }
-  .tb-spine-name {
-    font-family: var(--font-display);
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--ink);
-    text-decoration: none;
-    border-bottom: 1px solid var(--accent);
-  }
-  .tb-spine-name:hover { color: var(--accent); }
-
+  .hero-field .count { color: var(--accent); font-weight: 500; }
   @media (max-width: 560px) {
-    .tb-fields { grid-template-columns: repeat(2, 1fr); }
-    .tb-field:nth-child(2) { border-right: 0; }
-    .tb-field:nth-child(1),
-    .tb-field:nth-child(2) { border-bottom: 1px solid var(--rule-strong); }
+    .hero-fields { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* ── Lead story ────────────────────────────────────────────────────── */

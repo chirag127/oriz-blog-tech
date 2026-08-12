@@ -1,11 +1,11 @@
 ---
 /**
- * PostCard — editorial listing entry ("Signal Press"). One hairline-ruled
- * row (no rounded card, no shadow, no radius): a vertical-coloured kicker
- * rule + desk label, a serif headline, a one-line dek, and a mono meta foot
- * (date · reading time). Used by every listing (index, tag, category,
- * related). The whole entry is one link; the desk kicker deep-links to the
- * category.
+ * PostCard — a drawing-sheet ledger row for the left-sidebar shell.
+ *
+ * Distinct from the sibling "kicker-rule" card: each entry is framed like a
+ * sheet in a drawing register — a mono sheet-tab on the left (date + desk),
+ * a Space Grotesk headline + dek in the middle, and a discipline tick. The
+ * whole row is boxed on hover like a selected drawing. No shadow, no radius.
  */
 import type { CollectionEntry } from 'astro:content'
 import { formatPostDate, postVertical, slugifyTag, verticalLabel } from '~/lib/blog'
@@ -17,90 +17,87 @@ export interface Props {
 const { post } = Astro.props
 const { title, description, pubDate, category, readingTime } = post.data
 const href = `/blog/${post.id}`
-const catHref = `/categories/${slugifyTag(category)}/`
 const vert = postVertical(post)
 ---
 
-<article class="post-card" data-vertical={vert}>
-  <a class="post-card-link" href={href}>
-    <span class="post-card-kicker">
-      <span class="post-card-tick" aria-hidden="true"></span>
-      <span class="post-card-desk">{verticalLabel(vert)}</span>
-      <span class="post-card-cat">{category}</span>
-    </span>
-    <h3 class="post-card-title">{title}</h3>
-    <p class="post-card-desc">{description}</p>
-    <span class="post-card-foot">
+<article class="sheet" data-vertical={vert}>
+  <a class="sheet-link" href={href}>
+    <span class="sheet-tab mono">
       <time datetime={pubDate.toISOString()}>{formatPostDate(pubDate)}</time>
-      {readingTime && <span class="post-card-rt">{readingTime}</span>}
+      <span class="sheet-desk">{verticalLabel(vert)}</span>
     </span>
+    <span class="sheet-body">
+      <h3 class="sheet-title">{title}</h3>
+      <p class="sheet-desc">{description}</p>
+      <span class="sheet-foot mono">
+        <span class="sheet-cat">{category}</span>
+        {readingTime && <span class="sheet-rt">{readingTime}</span>}
+      </span>
+    </span>
+    <span class="sheet-tick" aria-hidden="true"></span>
   </a>
-  <a class="post-card-cat-link" href={catHref} aria-label={`More in ${category}`}>{category}</a>
 </article>
 
 <style>
-  .post-card {
-    position: relative;
-    border-top: 1px solid var(--rule);
+  .sheet {
     --v: var(--v-personal);
+    border-top: 1px solid var(--rule);
   }
-  .post-card[data-vertical='dev'] { --v: var(--v-dev); }
-  .post-card[data-vertical='finance'] { --v: var(--v-finance); }
-  .post-card[data-vertical='culture'] { --v: var(--v-culture); }
-  .post-card[data-vertical='health'] { --v: var(--v-health); }
+  .sheet[data-vertical='dev'] { --v: var(--v-dev); }
+  .sheet[data-vertical='finance'] { --v: var(--v-finance); }
+  .sheet[data-vertical='culture'] { --v: var(--v-culture); }
+  .sheet[data-vertical='health'] { --v: var(--v-health); }
 
-  .post-card-link {
+  .sheet-link {
     display: grid;
-    gap: 0.5rem;
-    padding: 1.125rem 0 1.25rem 0.875rem;
+    grid-template-columns: 8.5rem minmax(0, 1fr) 6px;
+    gap: 1.25rem;
+    align-items: start;
+    padding: 1.1rem 0.75rem 1.2rem;
+    margin-inline: -0.75rem;
     text-decoration: none;
     color: var(--ink);
-    border-left: 2px solid transparent;
-    margin-left: -0.875rem;
-    padding-left: 0.875rem;
-    transition: border-color var(--dur-fast, 120ms) ease;
+    border: 1px solid transparent;
+    transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease;
   }
-  .post-card-link:hover { border-left-color: var(--v); }
+  .sheet-link:hover {
+    background: color-mix(in oklab, var(--v) 6%, transparent);
+    border-color: color-mix(in oklab, var(--v) 30%, transparent);
+  }
+  .sheet-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-  .post-card-kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: var(--font-mono);
+  .sheet-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
     font-size: 11px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.04em;
+    color: var(--ink-mute);
+    padding-top: 0.15rem;
+  }
+  .sheet-tab time { color: var(--ink); }
+  .sheet-desk {
     text-transform: uppercase;
-    color: var(--ink-mute);
-  }
-  .post-card-tick {
-    width: 7px;
-    height: 7px;
-    background: var(--v);
-    flex: 0 0 auto;
-  }
-  .post-card-desk { color: var(--v); font-weight: 500; }
-  .post-card-cat {
-    color: var(--ink-mute);
-    border-left: 1px solid var(--rule);
-    padding-left: 0.5rem;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.16em;
+    color: var(--v);
+    font-weight: 500;
   }
 
-  .post-card-title {
+  .sheet-body { min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+  .sheet-title {
     font-family: var(--font-display);
-    font-size: 1.375rem;
+    font-size: 1.3125rem;
     font-weight: 600;
     letter-spacing: -0.015em;
-    line-height: 1.2;
+    line-height: 1.18;
     margin: 0;
     color: var(--ink);
   }
-  .post-card-link:hover .post-card-title { color: var(--accent); }
-
-  .post-card-desc {
+  .sheet-link:hover .sheet-title { color: var(--accent); }
+  .sheet-desc {
     color: var(--ink-mute);
     font-family: var(--font-body);
-    font-size: 0.9375rem;
+    font-size: 1rem;
     line-height: 1.5;
     margin: 0;
     max-width: 62ch;
@@ -110,42 +107,35 @@ const vert = postVertical(post)
     -webkit-box-orient: vertical;
     line-clamp: 2;
   }
-  .post-card-foot {
+  .sheet-foot {
     display: inline-flex;
     align-items: center;
     gap: 0.75rem;
-    font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: 0.06em;
     color: var(--ink-mute);
+    margin-top: 0.15rem;
   }
-  .post-card-rt::before {
-    content: '·';
-    margin-right: 0.75rem;
-    color: var(--rule-strong, var(--rule));
+  .sheet-cat { text-transform: uppercase; letter-spacing: 0.1em; }
+  .sheet-rt::before { content: '·'; margin-right: 0.75rem; color: var(--rule-strong); }
+
+  .sheet-tick {
+    align-self: stretch;
+    background: color-mix(in oklab, var(--v) 40%, transparent);
+    transition: background var(--dur-fast) ease;
   }
-  /* Sibling deep-link to category — visually hidden, keyboard reachable. */
-  .post-card-cat-link {
-    position: absolute;
-    inset: 0 0 auto auto;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-  .post-card-cat-link:focus-visible {
-    width: auto;
-    height: auto;
-    clip: auto;
-    top: 1.125rem;
-    right: 0;
-    padding: 0.125rem 0.5rem;
-    background: var(--paper);
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    text-transform: uppercase;
+  .sheet-link:hover .sheet-tick { background: var(--v); }
+
+  @media (max-width: 560px) {
+    .sheet-link {
+      grid-template-columns: minmax(0, 1fr) 6px;
+      gap: 0.75rem;
+    }
+    .sheet-tab {
+      flex-direction: row;
+      gap: 0.5rem;
+      grid-column: 1 / -1;
+    }
+    .sheet-tab .sheet-desk { border-left: 1px solid var(--rule); padding-left: 0.5rem; }
   }
 </style>
