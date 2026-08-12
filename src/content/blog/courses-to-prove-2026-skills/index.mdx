@@ -1,0 +1,135 @@
+---
+title: "The courses I'm completing to prove 2026's in-demand skills (and the repos that back them up)"
+description: "A proof-first course + cert map for 2026 skills. For each skill: the course to take, and the shipped repo that proves you can actually do it."
+pubDate: 2026-08-12
+category: "Dev"
+author: "Chirag Singhal"
+tags: ["career", "skills", "courses", "ai", "cloud"]
+---
+
+A course certificate proves you finished a course. Nothing more. It does not prove you can wire a retrieval pipeline that survives real traffic, or debug a Kubernetes pod that keeps getting OOM-killed at 3am. I learned this the boring way: I have a stack of completed courses, and none of them, on their own, moved a hiring conversation. What moved conversations was a link to a repo that runs.
+
+So this is not a "top 10 courses" listicle. It is my working plan: for each in-demand 2026 skill, the specific course or cert worth the time, and the concrete project I ship to make the skill real. Course plus shipped repo. That pair is the unit of proof. A certificate is the receipt; the repo is the product.
+
+I write this half for the reader and half for me. Some of the courses I list below I have already finished — and I will be honest about which of those are foundational and which are senior-grade. Spoiler: most of the finished ones are foundations, not mastery.
+
+## The skill → course → proof map
+
+The table is the core of this post. Read it as: to demonstrate the skill, take the course, then ship the repo. The repo is what a hiring manager or a client actually clicks.
+
+| In-demand skill (2026) | Course / cert worth taking | Proof-of-skill repo you ship |
+|---|---|---|
+| AI agents / LLM apps | IBM RAG and Agentic AI (Coursera); Scrimba AI Engineering (only mainstream course that covers MCP) | Multi-agent support system: a router agent + tool-using worker agents, live demo, cost-per-request logged in the README |
+| RAG / vector DB | Fundamentals of AI Agents Using RAG and LangChain (IBM); Generative AI Engineering with LLMs (IBM specialization) | PDF/doc Q&A: chunking → embeddings → vector store → LLM answer with citations; show eval numbers, not just a demo |
+| Cloud (AWS) | AWS Cloud Practitioner → Solutions Architect Associate; AWS Cloud Solutions Architect (Coursera, job-ready) | Terraform-provisioned VPC + Lambda + DynamoDB app; teardown script so it costs $0 idle |
+| Kubernetes / DevOps | Certified Kubernetes Administrator (CKA); Docker & Kubernetes Masterclass (Packt) | Home cluster manifests: deployment, HPA, ingress, health probes, a broken-pod runbook in the README |
+| Infra as code | HashiCorp Terraform Associate | Reusable Terraform modules repo (network, compute, db) with remote state and a CI plan check |
+| Go / systems | Programming with Google Go (UC Irvine); Go Essentials: Concurrency, gRPC & More (Packt) | Concurrent CLI or gRPC service: worker pool, context cancellation, benchmarks in the repo |
+| TypeScript / full-stack | Modern Web Development with TypeScript (Edureka); Learn TypeScript (Scrimba) | Next.js + Neon SaaS starter: server actions, typed API layer, auth, deployed with a live URL |
+| System design | ByteByteGo System Design Interview; Grokking the System Design Interview (Educative); DDIA (book) | Design docs repo: URL shortener, feed, notification system — each with trade-offs, capacity math, failure modes |
+
+Note the pattern in the "proof" column. None of them is "watch me follow the tutorial." Every one adds the thing a tutorial skips: cost logging, eval numbers, a teardown script, a runbook for when it breaks. That gap — between the happy path and the thing that survives production — is exactly what the course cannot certify and the repo can show.
+
+## What I've already completed (honestly)
+
+Here is the real list, finished through TCS's Udemy Business plus one Anthropic cert. I am mapping each to the skill it actually supports — and I am not going to pretend a beginner Python course makes me a systems engineer.
+
+**Foundational programming**
+- *Automate the Boring Stuff with Python* — Al Sweigart. Real, useful, and squarely beginner-to-intermediate scripting.
+- *Python for Beginners (Python 3)* — Jason Cannon, and *Practical Python Step by Step* — Edouard Renard. Foundations. Overlapping. Good baseline, not a differentiator.
+- *Master KnockoutJS* — a JS MVVM framework. Honestly, dated. Kept for MVVM concepts, not for the job market.
+
+**AI / LLM (the current frontier — but at the entry rung)**
+- *Intro to MCP (Model Context Protocol)* — Yash Thakker. Directly relevant; MCP is genuinely 2026-current and most courses still don't cover it.
+- *Generative AI for Beginners* and *Executive Briefing: AI + ChatGPT* — Kirill Eremenko. Awareness-level, not build-level.
+- *An Introduction to Machine Learning for Data Engineers* — Mike West. Introductory ML framing.
+- *Claude Certified Associate – Foundations* (Anthropic). A real credential, and a foundations-tier one. It says I know the fundamentals, not that I ship production LLM systems.
+
+**Governance / responsible AI**
+- *The EU AI Act Compliance Masterclass 2026* — Taimur Ijlal, and an *AI Ethics / Responsible Use* course. Increasingly valuable as compliance tightens, and an unusual thing for an engineer to hold. Not a coding skill, but a differentiator in regulated shops.
+
+**Soft skills and workflow (worth naming, not overselling)**
+- *Vibe Coding from Scratch* — Federico Garay. Workflow-level.
+- *Agile Project Management in 30 Minutes*, *A Mini Course on Time Management*, *Write Better Emails* — Hassan Osman, *Building Your English Brain*.
+- *Negotiation Secrets* — Dr. Claudia Winkler, and *Successful Negotiation* — Chris Croft. These two matter more than engineers admit — directly for freelance rate-setting.
+- *Credit Card Security Basics*. Narrow, domain-specific.
+
+The honest read: I have breadth across AI-awareness, Python foundations, and professional soft skills. What I do **not** yet have from this list is a senior-level credential in cloud, Kubernetes, or system design — the exact areas that command the highest pay. That is the gap.
+
+## The gaps I'm closing
+
+Each gap gets a credential and a repo. The credential is the search-filter keyword; the repo is the thing that gets me past the phone screen.
+
+- **AWS Solutions Architect Associate** ($150; ~4–8 weeks). Start with Cloud Practitioner ($100, 1–2 weeks) as the on-ramp. Proof repo: a Terraform-provisioned serverless app (Lambda + DynamoDB + API Gateway) with a one-command teardown so it never bills me while idle.
+- **HashiCorp Terraform Associate** (~$70; 3–5 weeks). Cheap, high-signal, and it pairs with the AWS work above. Proof repo: reusable IaC modules with remote state and a CI `terraform plan` gate.
+- **Certified Kubernetes Administrator, CKA** ($445 exam; includes two retakes and Killer.sh simulator access; 8–12 weeks). This is the hardest and highest-respect one — it's a hands-on lab, not multiple choice. Proof repo: a small cluster's manifests plus a written incident runbook.
+- **A deep system-design course** — ByteByteGo plus Educative's *Grokking the System Design Interview*. Proof repo: a `design-docs/` folder with three real designs, each showing capacity estimates and failure modes.
+- **DDIA — *Designing Data-Intensive Applications*, Martin Kleppmann** (book, not a course). The reference that turns system-design vocabulary into actual understanding of replication, partitioning, and consistency trade-offs. Proof: the trade-off sections of the design docs above should read like someone who finished this book.
+
+Total credential spend to close the gaps is roughly $765 plus the book. That is the cheapest career leverage I know of.
+
+## The 12-week plan
+
+Ordered. Each block is one course (or exam) plus the repo that proves it. Ship the repo in the same block — a course with no repo behind it is a half-finished block.
+
+| Weeks | Course / cert | Build in the same block |
+|---|---|---|
+| 1–2 | AWS Cloud Practitioner | Manually stand up + tear down a VPC, EC2, S3 static site |
+| 3–4 | Terraform Associate prep | Port that manual setup into Terraform modules with remote state |
+| 5–6 | AWS Solutions Architect Associate (sit the exam wk 6) | Serverless app repo (Lambda + DynamoDB + API Gateway), IaC-provisioned |
+| 7–8 | IBM RAG and Agentic AI (start) | PDF Q&A RAG repo with citations and an eval script |
+| 9 | Scrimba AI Engineering (MCP module) | Wrap the RAG app behind an MCP server; add one tool-using agent |
+| 10–11 | CKA prep (Killer.sh drills) | Deploy the RAG app to a K8s cluster; write the pod-failure runbook |
+| 12 | ByteByteGo + DDIA sprint | `design-docs/` repo: three designs with capacity math and trade-offs |
+
+CKA itself takes 8–12 weeks to be exam-ready, so treat weeks 10–11 as the *start* of that track, not the finish. The point of the grid is momentum: never let a course close without a commit landing.
+
+## The freelance angle
+
+Jobs reward the credential keyword on your profile. Freelance clients reward the live demo — they rarely ask which cert you hold; they ask "can you show me one you've shipped?" The highest-paying freelance skills in 2026, from the market data:
+
+- **AI agents and LLM apps** — top tier, roughly $75–$200+/hr. Multi-agent systems, LangGraph/LangChain.
+- **RAG / document pipelines** — same tier. Vector DBs (Pinecone, Weaviate), doc chatbots.
+- **Full-stack AI on Next.js** — Vercel-hosted, server actions, an LLM API wired in.
+- **Cloud architecture** — AWS deployments, cost optimization.
+- Second tier ($50–$120/hr): backend (Node, FastAPI), automation workflows, DevOps.
+
+The portfolio proof clients actually click, in priority order:
+
+1. **AI customer-support agent** — LangGraph + an LLM API + Next.js, deployed on Vercel, with API cost shown in the README. Solves a real, nameable pain.
+2. **RAG document Q&A** — LangChain + a vector DB + FastAPI, hosted on Railway or Render. Show the retrieval pipeline and the embedding model.
+3. **Next.js + Neon SaaS starter** — full-stack proof: auth, DB, deployed URL. Clients read "I can build the whole thing" from this.
+4. **An open-source tool with stars** — a CLI or npm package. Stars are social proof a certificate can't buy.
+
+No degree required for any of this. Udacity Nanodegree or a Coursera Professional Certificate is sufficient signal; three to four shipped projects matching the top trends do the rest. Start clients around $50–$75/hr, raise to $120+ after three to five clean deliveries. Those negotiation courses I listed earlier? This is where they pay for themselves.
+
+## Proof over certificates
+
+Certificates get you found. Repos get you hired. The certificate is a keyword a recruiter's filter matches; the repo is the thing a senior engineer or a paying client reads to decide if you're real.
+
+If I could give my earlier self one instruction: stop collecting completion badges and start shipping the small, boring, *finished* thing that a course only gestures at — the teardown script, the eval numbers, the runbook for when the pod dies. That gap between "I watched the tutorial" and "here's the running thing with its rough edges documented" is the entire job.
+
+So: pick one row of the first table. Take the course. Ship the repo in the same block. Put the link where people can click it. Then do the next row. That's the whole method.
+
+## Sources
+
+- [Coursera — AWS Cloud Solutions](https://www.coursera.org/search?query=AWS+cloud+solutions)
+- [AWS Certification Overview](https://aws.amazon.com/certification/)
+- [AWS Certified Solutions Architect – Associate](https://aws.amazon.com/certification/certified-solutions-architect-associate/)
+- [Linux Foundation — Certified Kubernetes Administrator (CKA)](https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/)
+- [Coursera — Kubernetes & Containers](https://www.coursera.org/search?query=Kubernetes+container)
+- [HashiCorp Terraform Certification](https://www.hashicorp.com/certification)
+- [Coursera — LLM, AI Agents & RAG](https://www.coursera.org/search?query=LLM+AI+agents+RAG)
+- [Scrimba — AI Engineering](https://scrimba.com)
+- [Coursera — AI Engineering / LLM](https://www.coursera.org/search?query=AI+engineering+LLM)
+- [Coursera — Go Programming](https://www.coursera.org/search?query=Go+programming+language)
+- [Coursera — TypeScript](https://www.coursera.org/search?query=TypeScript)
+- [Coursera — System Design](https://www.coursera.org/search?query=system+design)
+- [ByteByteGo](https://bytebytego.com)
+- [Educative — Grokking the System Design Interview](https://educative.io/courses)
+- [Designing Data-Intensive Applications (DDIA)](https://dataintensive.net)
+- [System Design Primer (GitHub)](https://github.com/donnemartin/system-design-primer)
+- [Udacity — AI programs](https://www.udacity.com/courses/all)
+- [GitHub Trending](https://github.com/trending)
+- [AWS Certification (freelance signal)](https://aws.amazon.com/certification)
+- [Toptal Freelance Network](https://www.toptal.com)
