@@ -1,0 +1,215 @@
+---
+title: "Orchestrating hundreds of subagents with Claude Code: the patterns that actually work"
+description: "A first-person, honest engineering guide to multi-agent fan-out with Claude Code — pipeline vs parallel, adversarial verification, worktree isolation, and when NOT to reach for it. From a solo dev who ran ~100-agent research swarms for real work."
+pubDate: 2026-08-13
+category: "Engineering"
+tags: ["claude-code", "ai-agents", "multi-agent", "orchestration", "mcp", "agentic-workflows", "llm"]
+author: "Chirag Singhal"
+---
+
+A single chat thread has a ceiling, and you feel it the moment the work gets big. The context window fills. The model starts forgetting what you told it forty messages ago. A task that should be forty independent lookups becomes forty sequential ones, each waiting on the last. You end up babysitting a genius who can only hold one thought at a time.
+
+The fix I reached for — and the thing this post is actually about — is fanning the work out across many agents instead of grinding it through one. In a single working session I ran multiple deep-research swarms of roughly a hundred agents each, converted five MCP servers to a new transport in parallel, reorganised content across a dozen repos, and recovered a workflow that had died mid-run. None of that fits in one chat thread. All of it fits in a fan-out.
+
+This is the honest version of how that works: the patterns that held up, the ones that backfired, the mechanics you have to know, and — the part most breathless "AI swarm" posts skip — when you should not do any of it and just use one agent instead. I will attribute every vendor number as exactly that: a vendor-reported internal eval, not an independent benchmark. Where I have named a pattern or made a mapping, I will say it is my synthesis, not Anthropic's framing.
+
+One caveat up front, because it colours everything: I am a solo developer, not a team running this at scale with a budget line for tokens. That constraint is a feature for a post like this. When you are paying for every run out of your own pocket, you develop a fast, unsentimental sense of when fanning out is worth it and when it is a costly way to look busy. Most of what follows is that sense, written down — the times the parallelism paid for itself, and the roughly equal number of times I killed a fan-out and went back to a single agent because the swarm was solving a problem I did not have.
+
+## Background: the jargon, minus the hand-waving
+
+Before the patterns, the vocabulary. If you already live in this world, skim; if you do not, these five terms are load-bearing for everything below.
+
+**Agent.** In the sense that matters here, an agent is an LLM in a loop with tools: it reads a goal, decides on an action, calls a tool, observes the result, and repeats until it judges the task done. The key word is *decides*. The model is directing its own process, not following a script you wrote.
+
+**Subagent.** A child agent that a parent agent spawns to do a scoped piece of work. In Claude Code, each subagent gets its own context window, its own tool set, and its own permissions — and, critically, it is **blind to the parent conversation.** It sees only the prompt you hand it. That single fact shapes every good fan-out design: subagents need self-contained prompts and a single written source of truth, because they cannot peek at what the orchestrator knows.
+
+**Tool use.** The mechanism by which the model reaches outside its own text — running a shell command, reading a file, hitting an API, searching the web. The model emits a structured request to call a named tool with arguments; the harness runs it and feeds the result back. Everything an agent *does* rather than *says* is a tool call.
+
+**MCP (Model Context Protocol).** An open standard — JSON-RPC 2.0 under the hood — for exposing tools, resources, and prompts to a model in a uniform way. The tagline people use is "USB-C for tools": instead of every application inventing its own bespoke tool-wiring, an MCP server exposes **Resources**, **Prompts**, and **Tools** over one protocol, and any MCP-speaking client can consume them. It is the uniform tool layer that makes a fleet of agents portable across hosts.
+
+**Structured output.** Forcing the model's return to conform to a JSON schema. Validation happens at the tool layer — if the model returns something that does not match the schema, it is asked to retry. This is what lets one stage's output be parsed reliably by the next stage instead of you regex-scraping prose.
+
+### Workflows vs agents — Anthropic's taxonomy
+
+Anthropic's "Building Effective Agents" draws a line I find genuinely useful. It distinguishes **workflows** — systems where LLMs and tools are orchestrated through *predefined code paths* — from **agents** — systems where the LLM *dynamically directs its own process and tool usage.* A workflow is a railroad; an agent lays its own track.
+
+The same piece lays out five composable patterns:
+
+- **Prompt chaining** — decompose a task into a fixed sequence of steps, each LLM call feeding the next.
+- **Routing** — classify an input, then send it to a specialised follow-up.
+- **Parallelization** — run work concurrently, in two forms (more on this below).
+- **Orchestrator-workers** — a lead model decomposes a task and delegates to worker subagents.
+- **Evaluator-optimizer** — one call generates, another critiques, and the pair loops.
+
+Here is my synthesis, and I want to flag it as mine rather than Anthropic's labels: the fan-out vocabulary I use maps onto that taxonomy fairly cleanly. My **pipeline** is essentially prompt chaining. My **fan-out** is the *sectioning* form of parallelization. My **adversarial verification** is a scheme layered on the *voting* form, with an evaluator-optimizer flavour. The mapping is a convenience, not a claim that Anthropic frames it this way.
+
+Parallelization itself splits into two forms worth naming precisely:
+
+- **Sectioning** — break a task into *independent* subtasks and run them at the same time. The deep-research swarm's parallel searchers are sectioning: each searcher owns a different slice of the question.
+- **Voting** — run the *same* task multiple times to get diverse or cross-checked outputs. Anthropic frames voting broadly as a way to get diverse outputs. My "3-vote, 2-of-3-refutes-kills-a-claim" verification is a specific adversarial scheme I built *on top of* voting — the "adversarial" framing is my engineering choice, not Anthropic's term.
+
+### The one line to tattoo on your wrist
+
+Anthropic's own recommendation is to **start simple** and "add multi-step agentic systems only when simpler solutions fall short." The stated trade-off is blunt: "agentic systems trade latency and cost for better performance." Multi-agent orchestration earns its place on work that is heavily parallelizable and exceeds a single context window. It is a *bad* fit for tasks that share tight context, are highly interdependent, or — this one surprises people — most coding tasks, where a single well-briefed agent usually wins.
+
+I will come back to the cost of all this, because it is the part that keeps you honest.
+
+## The patterns, with mechanics
+
+Let me put the four shapes I actually use side by side, then dig into each.
+
+| Pattern | Structure | Best for | Main cost / risk |
+|---------|-----------|----------|------------------|
+| Single agent | One LLM in a tool loop | Interdependent work, most coding, anything needing shared context | Serial; bounded by one context window |
+| Parallel fan-out (sectioning) | Orchestrator spawns N independent workers at once | Wide, independent lookups — research, multi-repo edits | Token spend scales with N; coordination drift |
+| Pipeline (prompt chaining) | Stage 1 → Stage 2 → Stage 3, output feeds forward | Staged transforms where each step depends on the last | Latency accumulates; one broken stage stalls the line |
+| Adversarial verify (voting + evaluator) | Same claim checked by multiple independent votes | High-stakes correctness — facts, security, money | Most expensive per unit of output |
+
+### Pipeline vs the barrier: why independence changes everything
+
+The subtle mistake people make with fan-out is running everything as a **barrier**: spawn a wave of agents, wait for *all* of them to finish, collect results, spawn the next wave. That is fine when the next stage genuinely needs every result from the previous one. It is wasteful when the stages are independent.
+
+Consider a research swarm. If searcher #3 finishes in ten seconds and searcher #5 takes ninety, a barrier makes #3 sit idle for eighty seconds before the fetch-and-extract stage can start on *anything.* But fetch-and-extract on #3's results does not depend on #5 at all. A **pipeline** lets #3's output flow straight into the next stage while #5 is still searching. You pay no barrier latency; the slowest agent in a wave no longer sets the pace for the whole wave.
+
+The rule I settled on: **use a barrier only when a downstream stage truly needs the union of all upstream outputs** (a final synthesis, say). Everywhere the stages are independent per-item, prefer a pipeline and let work stream through. Pipeline wins precisely because independence removes the reason to wait.
+
+There is a second, quieter benefit to pipelining that I did not appreciate until a run failed halfway. A barrier concentrates risk: if the collection step at the end of a wave throws, you can lose the whole wave's work. A pipeline spreads that risk out — each item that has already flowed to a later stage is already partly banked. When something breaks, you have lost less. Combined with resume-from-run (below), a pipelined fan-out degrades gracefully in a way a barriered one does not.
+
+### The deep-research harness, worked
+
+Here is the shape I ran, repeatedly, to produce fact-checked finance posts. It is an orchestrator-worker system with a verification layer bolted on:
+
+1. **Scope.** The lead agent (a strong model — think Opus-tier for the decomposition) reads the question and breaks it into non-overlapping search directions. This is the decomposition step, and it is where most of the quality comes from. A sloppy scope produces a swarm of agents tripping over each other.
+2. **Fan-out search (~5 parallel searchers).** Each searcher (a cheaper, faster model — Sonnet-tier) owns one direction and runs several tool calls *in parallel itself* — multiple web searches at once. This is sectioning at two levels: parallel searchers, each internally parallel. Anthropic's reference multi-agent research system uses exactly this shape — a lead decomposes, spins up three to five subagents in parallel, each using three-plus tools in parallel — and reports up to a 90% cut in research time for complex queries. That 90% is **vendor-reported from an internal eval**, not something I or any third party independently benchmarked; treat it as a directional claim, not a guarantee.
+3. **Fetch and extract claims.** Fetched pages get reduced to discrete, checkable claims — each with its source URL. Structured output matters here: I force each claim into a JSON shape (`claim`, `source_url`, `confidence`) so the next stage can parse it mechanically.
+4. **Adversarial verify (3 votes).** Each claim is independently checked three times by fresh agents that do not see each other's verdicts. My rule: **if two of three refute a claim, the claim dies.** This is voting, used adversarially — I am not asking "what's the consensus answer," I am asking "can this survive three independent attempts to knock it down." The framing is mine; Anthropic describes voting more neutrally as a route to diverse, cross-checked outputs.
+5. **Synthesize with citations.** A final agent takes only the *surviving* claims and writes prose, keeping each citation attached. Because the claims arrived as structured objects, the synthesis stage never has to guess which URL backs which sentence.
+
+Roughly a hundred agents across the whole run — but, and this is the mechanic people miss, **never a hundred at once.** More on that in a moment.
+
+### Worktree isolation, and the wrong-repo failure I hit
+
+Git worktrees are a clean way to isolate an agent: give it its own checkout so its edits cannot collide with another agent's, then merge or discard. For parallel work on *the same repo* it is excellent.
+
+It bit me hard on a task where it was the wrong tool. I was converting five MCP servers to a new transport, and I fanned out one agent per server. My instinct was to worktree-isolate each agent. The problem: each agent's target was a **different repo.** Worktree isolation pins an agent to a single repository's tree — so an agent isolated to repo A, whose actual job was to edit repo B, found *all of its writes blocked.* It could read, reason, plan, and then fail at the last step because it was fenced into the wrong yard.
+
+The fix was not "configure the worktree better." It was "do not worktree-isolate agents that each touch a *different* repo." Worktree isolation is for contention within one repo. When your parallelism is *across* repos, the natural isolation boundary is the repo itself — you do not need worktrees, and adding them actively breaks the run. I now treat "same repo or different repo?" as the first question before reaching for a worktree.
+
+The broader lesson generalises past worktrees. Every isolation mechanism has a *unit* it operates on — a worktree isolates within a repo, a container isolates a process, a scoped permission isolates a capability. Fan-out goes wrong when the unit of isolation and the unit of parallelism disagree. My five MCP-server agents were parallel *across repos*, but I reached for an isolation primitive that operates *within* a repo. The mismatch was invisible until the writes silently failed. The habit I built out of it: name the unit of parallelism explicitly ("one agent per repo"), then pick an isolation boundary that operates on that same unit — nothing finer, nothing coarser.
+
+### Resume-from-run: caching that saved a dead workflow
+
+Long fan-outs fail partway through. In one run, a stage that used structured output hit its **retry cap** — the model returned schema-invalid output five times in a row, and the harness aborted the workflow rather than loop forever. Annoying, but transient: the underlying task was fine, one agent just got unlucky with its formatting.
+
+The recovery mechanic is **resume-from-run.** Instead of re-executing the entire swarm from scratch — re-paying for every search, every fetch, every verification that already succeeded — a resume replays the cached prefix and only re-runs the agents that *failed or changed.* The successful ninety-something agents' work is reused; the one that tripped the cap gets another go. On a hundred-agent run, this is the difference between a two-minute recovery and starting over. It also changes how I feel about aggressive schemas: I can afford strict validation because a cap-abort is cheap to resume from, not catastrophic.
+
+### Structured output as the glue
+
+I keep coming back to structured output because it is the quiet workhorse of any multi-stage fan-out. When stage N hands work to stage N+1, prose is a liability — the next agent has to *interpret* it, and interpretation drifts. A JSON schema turns the handoff into a contract. The tool layer validates the shape; a mismatch triggers a model retry rather than silently corrupting the pipeline. Downstream stages parse instead of guess. In the research harness, claims, verdicts, and citations all move as schema-validated objects, and that is the only reason the final synthesis can attach the right source to the right sentence without hallucinating the link.
+
+### Concurrency caps, nesting, and why "100 agents" is really waves
+
+Now the mechanic that reframes the whole "hundred-agent swarm" idea. Claude Code caps **concurrent** subagents — roughly twenty at a time, and configurable — while the **total** number of spawns over a run is effectively unlimited. Nesting is bounded too: by default an agent tree goes about three layers deep before you stop being able to spawn deeper.
+
+Put those together and a "100-agent fan-out" is not a hundred agents firing in one burst. It is a **sequence of bounded waves** — the orchestrator spawns up to the concurrency cap, they run, they retire, the next batch spawns. The number a hundred describes the *total work done across the run,* not a moment-in-time parallelism. This matters for two reasons. First, it sets realistic latency expectations: you are not getting hundred-way speedup, you are getting roughly twenty-way, wave after wave. Second, it means a runaway fan-out is self-limiting on concurrency but *not* on total spend — which is exactly where cost bites.
+
+## Two more case studies: the reorg and the transport conversion
+
+The research swarm is the glamorous example. Two duller runs from the same session taught me more about *structuring* a fan-out.
+
+### The multi-repo blog reorg
+
+I needed to reorganise content across roughly a dozen blog repos at once — posts moving between hub and spoke sites, categories being normalised, frontmatter being reshaped. The obvious way to do this serially would have taken an evening of my attention. Fanned out, it took a fraction of that, and the reason it worked cleanly comes down to one design decision: **I split the work by non-overlapping file ownership.**
+
+Each agent was handed a disjoint set of files — this agent owns these posts in this repo, that agent owns those posts in that repo. No two agents could ever touch the same path. That is not a coincidence I got lucky with; it is the property I designed for *first,* before writing a single prompt. When ownership is disjoint by construction, you do not need locks, you do not need merge coordination, and you do not get the class of bug where two agents both edit a file and the second silently clobbers the first. Collisions become impossible rather than merely unlikely.
+
+The moment you cannot cleanly partition ownership is the moment to question whether the task is really parallel. If two agents *would* need to edit the same file, that shared file is a coordination point — a barrier — and pretending otherwise just moves the collision from design time to run time, where it is far more expensive to debug.
+
+### Converting five MCP servers to Streamable HTTP
+
+This is the run where I hit the worktree bug, but it is also a clean example of *sectioning across repos.* I had five MCP servers to migrate to Streamable HTTP transport. The migrations were independent — each server lived in its own repo, and the change to server A had no bearing on server B. That independence is exactly the signal that says "fan out": five agents, one per server, running the same shape of change against different code.
+
+The two things I would tell my earlier-in-the-session self: first, do not worktree-isolate them (the boundary was the repo, not a worktree), and second, give each agent a *self-contained* spec of the target transport shape. Because subagents are blind to the parent conversation, "convert it the way we discussed" means nothing to them — they were not in the discussion. The spec that worked was a written description of the before-and-after transport wiring, handed to each agent identically, so all five produced consistent conversions without me repeating myself five times or, worse, describing it slightly differently each time and getting five subtly different results.
+
+## The failure modes, from real runs
+
+Every one of these is something I actually hit in a single working session, not a hypothetical. Covered above: agents isolated to one repo, tasked to edit another, get all writes blocked. Fix: match the isolation boundary to the unit of parallelism. Cross-repo parallelism needs no worktrees.
+
+**Structured-output retry cap aborts the run.** Five schema-invalid returns in a row and the workflow dies. It is transient. Fix: resume-from-run replays the cached prefix and re-runs only the failed agent. Do not restart from zero.
+
+**Provider rate-limits (429) under heavy fan-out.** Twenty concurrent agents, each making several parallel tool and model calls, will find your provider's rate ceiling fast. Fix: respect the concurrency cap, add backoff, and stagger waves rather than slamming the whole swarm at once.
+
+**Agents confused by mid-flight redirects.** Because subagents are blind to the parent conversation, changing your mind *after* they have their prompts is poison — some agents work off the old instruction, some the new, and you get an inconsistent result. Fix: keep a **single written source-of-truth spec** the agents read, and change *that* rather than shouting new instructions into the void. If the spec changes materially, re-issue the affected agents rather than trusting them to notice.
+
+**Over-share and amplification.** The dark side of fan-out: a bad instruction does not stay contained. Broadcast a flawed premise to forty agents and you get forty confidently wrong outputs, all agreeing with each other because they inherited the same mistake. This is the multi-agent version of a single typo, scaled. Fix: verify the *instruction* before the fan-out, not just the outputs after — and use adversarial verification precisely because agreement among agents that shared a prompt is not evidence of correctness.
+
+## When to reach for multi-agent — and when not to
+
+This is the section I wish more people led with. The default should be a single agent. Multi-agent is the exception you justify, not the reflex you reach for.
+
+| Signal | Single agent | Multi-agent fan-out |
+|--------|:---:|:---:|
+| Work is heavily parallelizable | | Yes |
+| Task exceeds one context window | | Yes |
+| Subtasks are independent | | Yes |
+| Subtasks share tight, evolving context | Yes | |
+| Steps are highly interdependent | Yes | |
+| It's a coding task | Yes (usually) | |
+| Correctness is high-stakes (facts, money, security) | | Yes (add adversarial verify) |
+| Latency matters more than throughput | Yes | |
+| Budget is tight and the task is small | Yes | |
+| Size of the work is unknown up front | | Yes (loop-until-dry) |
+
+The quick decision checklist I run before fanning out:
+
+1. **Is the work genuinely parallel?** If subtask B needs subtask A's output, that is a pipeline at best, not a fan-out — and maybe just one agent.
+2. **Does it exceed one context window?** If it fits in one, one agent will be cheaper and less error-prone.
+3. **Can I split it by non-overlapping ownership?** If two agents would edit the same file or answer the same sub-question, the split is wrong.
+4. **Is it worth ~15x the tokens?** Be honest. If the answer is no, use one agent.
+
+If you clear all four, here is how to structure the fan-out well:
+
+- **Split by non-overlapping file ownership.** The multi-repo blog reorg I did worked because each agent owned a disjoint set of files. No two agents could conflict because no two agents touched the same path. This is the single most important design rule for parallel edits — collisions are a coordination cost you avoid by construction, not by locking.
+- **Verify adversarially.** For anything where being wrong is expensive, do not trust a single agent's output or even a consensus of agents that shared a prompt. Have independent agents try to *refute* the result.
+- **Loop-until-dry for unknown-size discovery.** When you do not know how much work there is — "find every deprecated call across the fleet" — do not guess a wave size. Keep spawning discovery agents until a wave comes back empty. The emptiness is your termination condition.
+- **Add completeness critics.** A cheap final agent whose only job is to ask "what did we miss?" catches the gaps a swarm leaves when each member only saw its own slice. Fan-out fragments the view; a critic reassembles it.
+
+And the pitfalls to design against, restated as rules: match isolation to the unit of parallelism; keep a single written spec; verify instructions before broadcasting them; expect and plan for rate limits; and lean on resume-from-run so a partial failure is cheap.
+
+## The honest cost trade-off
+
+Here is the part the swarm-hype posts bury. Multi-agent orchestration is *expensive*, and the expense is the whole reason "start simple" is the right default.
+
+Anthropic's reported figures — again, **vendor-reported internal evals, not independent benchmarks** — put it starkly. An agent burns on the order of **4x the tokens** of an ordinary chat interaction. A multi-agent system burns roughly **15x.** And they report that token usage alone explains about **80% of the performance variance** across their evals — which is another way of saying the performance you are buying is, to a large degree, *the tokens you are spending.*
+
+Read those numbers honestly and the conclusion writes itself: multi-agent is worth it only when the task justifies the spend. A hundred-agent research swarm to fact-check a blog post that will be read for years — worth it. A hundred-agent swarm to rename a variable — absurd. The framing that keeps me disciplined is Anthropic's own: agentic systems *trade latency and cost for better performance.* If you are not getting performance you could not get any other way, you are just lighting tokens on fire in parallel.
+
+The corollary for solo devs specifically: the 15x multiplier is real money on a personal budget. I reach for fan-out on research and wide, independent edits — work where the alternative is hours of my own serial effort — and I stay with a single agent for everything else. The multiplier is the tax; the parallelism has to be worth the tax.
+
+There is a subtler point hiding in the "80% of variance is token usage" figure, and it is worth sitting with. If performance tracks spend that closely, then a lot of what feels like clever orchestration is really just *permission to spend more tokens on the problem.* That reframes the design question. The value of a fan-out is not the parallelism for its own sake — it is that decomposing a task into independent pieces lets you throw far more total tokens at it than a single context window could ever hold, and do it without the model drowning in its own context. The orchestration is the mechanism; the tokens are the substance. Which means the honest test of a fan-out is not "did it run a hundred agents" but "did the extra tokens buy an answer I could not have gotten from one agent." If a single agent with a tighter prompt would have landed the same result, the swarm was theatre.
+
+## A note on currency
+
+Everything mechanical in this post is a snapshot of a fast-moving target, and I want to be explicit about which parts to distrust as time passes.
+
+**Time-sensitive** — verify against current docs before relying on them: the specific concurrency cap (~20), the nesting depth (~3 layers), the structured-output retry count (5), tool and command names, and the exact vendor figures (90% / 4x / 15x / 80%). Tooling in this space changes month to month; caps get raised, APIs get renamed, evals get re-run.
+
+**Durable** — the engineering ideas that should outlast the tooling: workflows vs agents, sectioning vs voting, pipeline over barrier when stages are independent, matching isolation to the unit of parallelism, verifying adversarially, splitting by non-overlapping ownership, and the iron law that parallelism costs tokens. If a future version of any of this renames every command, those principles still hold.
+
+When in doubt, treat the primary sources below as the current truth and this post as the reasoning that connects them.
+
+## Conclusion
+
+The reason to fan out is not that swarms are impressive. It is that some work genuinely does not fit in one thread — it is too wide, too big for one context window, or too important to trust to a single pass. For that work, the patterns hold up: decompose cleanly, section the independent parts, pipeline instead of barrier when you can, verify the high-stakes results adversarially, split edits by ownership so collisions cannot happen, and lean on resume-from-run so failure is cheap.
+
+But the discipline matters more than the machinery. The default is one agent. Multi-agent is the exception you justify against a 15x token bill, on work that is genuinely parallel and genuinely large. Most of the time — most coding, most interdependent tasks, anything sharing tight context — a single well-briefed agent reading a single source of truth beats a swarm. The skill is not spinning up a hundred agents. It is knowing the handful of times you should.
+
+## Sources and further reading
+
+- Anthropic — [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents). The workflows-vs-agents taxonomy and the five composable patterns (prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer), plus the "start simple" guidance.
+- Anthropic — [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system). The orchestrator-worker reference architecture and the vendor-reported figures (up-to-90% research-time reduction, ~4x / ~15x token usage, ~80% of performance variance explained by token usage).
+- [Model Context Protocol specification](https://modelcontextprotocol.io/) — the JSON-RPC 2.0 standard exposing Resources, Prompts, and Tools; the uniform tool layer for a portable agent fleet.
+- Simon Willison — [writing on LLM agents and tool use](https://simonwillison.net/tags/agents/). A grounded, skeptical running commentary on what agents can and cannot do.
+- Yao et al. — [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629). The reason-then-act tool-use loop that underpins the "LLM in a loop with tools" definition used throughout this post.
+
+*General engineering writing, not vendor guidance. Caps, APIs, and vendor figures change; confirm current values against the primary sources before you depend on them.*
